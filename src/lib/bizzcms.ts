@@ -102,7 +102,7 @@ export async function getCharactersByAccount(
     const [rows] = await connection.execute(
       `SELECT guid, name, race, class, level, gender, skin, face, 
               hairStyle, hairColor, facialStyle, createtime, deletetime
-       FROM character WHERE account = ?`,
+       FROM characters WHERE account = ?`,
       [accountId]
     );
 

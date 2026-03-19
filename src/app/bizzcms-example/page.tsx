@@ -42,9 +42,9 @@ export default async function CharactersPage() {
   let error: string | null = null;
 
   try {
-    // Obtener todos los personajes de la tabla 'character'
+    // Obtener todos los personajes de la tabla 'characters'
     // Limitar a 100 para no sobrecargar
-    characters = await getTableData<Character>('character', {}, 100);
+    characters = await getTableData<Character>('characters', {}, 100);
   } catch (err) {
     error = err instanceof Error ? err.message : 'Error desconocido al conectar a MySQL';
     console.error('Error:', err);

@@ -29,7 +29,7 @@ export async function executeSoapCommand(command: string) {
     const response = await fetch(soapEndpoint, {
       method: 'POST',
       headers: {
-        Authorization: \`Basic \${auth}\`,
+        Authorization: `Basic ${auth}`,
         'Content-Type': 'text/xml; charset=utf-8',
         SOAPAction: 'executeCommand',
       },
@@ -40,12 +40,12 @@ export async function executeSoapCommand(command: string) {
     const text = await response.text();
     
     if (!response.ok) {
-      throw new Error(\`SOAP HTTP \${response.status}: \${text}\`);
+      throw new Error(`SOAP HTTP ${response.status}: ${text}`);
     }
 
     // AzerothCore a veces devuelve un fault dentro de un 200 OK.
     if (/faultcode|SOAP-ENV:Fault|<result>false<\/result>/i.test(text)) {
-      throw new Error(\`SOAP command failed: \${text}\`);
+      throw new Error(`SOAP command failed: ${text}`);
     }
 
     return { skipped: false, response: text };

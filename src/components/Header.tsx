@@ -118,7 +118,7 @@ export default function Header() {
             <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-400/30 to-purple-600/40 blur-md scale-110 group-hover:opacity-100 opacity-70 transition-opacity duration-300" />
             <div className="absolute inset-0 rounded-full border border-cyan-300/40" />
             <Image
-              src="/shadow_azeroth.png"
+              src="/shadow-azeroth.png"
               alt="Shadow Azeroth"
               fill
               className="object-cover rounded-full"
