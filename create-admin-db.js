@@ -44,8 +44,8 @@ async function main() {
         host: process.env.DB_HOST,
         port: parseInt(process.env.DB_PORT || '3306'),
         user: process.env.DB_USER,
-        password: process.env.DB_PASS,
-        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD || process.env.DB_PASS,
+        database: process.env.DB_AUTH || 'acore_auth',
     });
 
     const username = 'ADMIN';

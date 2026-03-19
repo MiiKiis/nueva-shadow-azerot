@@ -78,10 +78,10 @@ export async function POST(request: Request) {
     const quality = qualityOptions.includes(rawQuality) ? rawQuality : 'comun';
 
     const rawCategory = String(body?.category || 'misc').toLowerCase();
-    const categoryOptions = ['pve','pvp','misc'];
+    const categoryOptions = ['pve', 'pvp', 'profesiones', 'monturas', 'transmo', 'oro', 'boost', 'misc'];
     const category = categoryOptions.includes(rawCategory) ? rawCategory : 'misc';
 
-    const tier = Math.max(0, Math.min(9, Number(body?.tier ?? 0)));
+    const tier = Math.max(0, Math.min(999, Number(body?.tier ?? 0)));
     const classMask = Math.max(0, Number(body?.classMask ?? 0));
     const image = String(body?.image || 'inv_misc_questionmark').trim() || 'inv_misc_questionmark';
     const soapCount = Math.max(1, Math.min(255, Number(body?.soapCount ?? 1)));
@@ -116,6 +116,59 @@ export async function POST(request: Request) {
       { error: 'No se pudo agregar el item', details: error.message },
       { status: 500 }
     );
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const userId = Number(body?.userId || 0);
+    const id = Number(body?.id || 0);
+    
+    const adminCheck = await assertAdmin(userId);
+    if (!adminCheck.ok) {
+      return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status || 403 });
+    }
+
+    if (!Number.isInteger(id) || id <= 0) {
+      return NextResponse.json({ error: 'ID de item invalido' }, { status: 400 });
+    }
+
+    const name = String(body?.name || '').trim();
+    const itemId = Number(body?.itemId || 0);
+    const price = Number(body?.price || 0);
+    const rawCurrency = String(body?.currency || 'vp').toLowerCase();
+    const currency = rawCurrency === 'dp' ? 'dp' : 'vp';
+    const rawCategory = String(body?.category || 'misc').toLowerCase();
+    const category = ['pve', 'pvp', 'profesiones', 'monturas', 'transmo', 'oro', 'boost', 'misc'].includes(rawCategory) ? rawCategory : 'misc';
+    const tier = Math.max(0, Math.min(999, Number(body?.tier ?? 0)));
+    const classMask = Math.max(0, Number(body?.classMask ?? 0));
+    const image = String(body?.image || 'inv_misc_questionmark').trim();
+    const soapCount = Math.max(1, Math.min(255, Number(body?.soapCount ?? 1)));
+    const service_type = String(body?.serviceType || 'none');
+    const service_data = body?.serviceData ? String(body.serviceData) : null;
+
+    const [result]: any = await authPool.query(
+      `UPDATE shop_items SET 
+        name = ?, item_id = ?, price = ?, currency = ?, image = ?, 
+        quality = ?, category = ?, tier = ?, class_mask = ?, 
+        soap_item_entry = ?, soap_item_count = ?, service_type = ?, service_data = ?
+       WHERE id = ? LIMIT 1`,
+      [
+        name, itemId, price, currency, image, 
+        body?.quality || 'comun', category, tier, classMask, 
+        itemId || null, soapCount, service_type, service_data, id
+      ]
+    );
+
+    if (!result?.affectedRows) {
+      return NextResponse.json({ error: 'Item no encontrado para actualizar' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, message: 'Item actualizado correctamente' });
+  } catch (error: any) {
+    console.error('Admin shop PUT error:', error);
+    return NextResponse.json({ error: 'No se pudo actualizar el item', details: error.message }, { status: 500 });
   }
 }
 

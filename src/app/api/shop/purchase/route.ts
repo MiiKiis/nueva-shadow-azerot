@@ -62,11 +62,7 @@ async function ensurePurchaseHistoryTable(connection: Awaited<ReturnType<typeof 
   `);
 }
 
-async function sendSoapItem(params: {
-  characterName: string;
-  itemEntry: number;
-  itemCount: number;
-}) {
+async function executeSoapCommand(command: string) {
   const soapEndpoint = process.env.ACORE_SOAP_URL;
   const soapUser = process.env.ACORE_SOAP_USER;
   const soapPassword = process.env.ACORE_SOAP_PASSWORD;
@@ -76,7 +72,6 @@ async function sendSoapItem(params: {
     return { skipped: true };
   }
 
-  const command = `.send items ${params.characterName} "Tienda Shadow Azeroth" "Gracias por tu compra" ${params.itemEntry}:${params.itemCount}`;
   const xml = `<?xml version="1.0" encoding="utf-8"?>
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:AC">
   <SOAP-ENV:Body>
@@ -108,6 +103,15 @@ async function sendSoapItem(params: {
   }
 
   return { skipped: false };
+}
+
+async function sendSoapItem(params: {
+  characterName: string;
+  itemEntry: number;
+  itemCount: number;
+}) {
+  const command = `.send items ${params.characterName} "Blizzard" "gracias por tu apoyo esto ayuda al servidor" ${params.itemEntry}:${params.itemCount}`;
+  return executeSoapCommand(command);
 }
 
 export async function POST(request: Request) {
@@ -269,7 +273,14 @@ export async function POST(request: Request) {
           case 'gold_pack':
             const goldAmount = Number(item.service_data) || 1000;
             const copperAmount = goldAmount * 10000;
-            await charPool.query('UPDATE characters SET money = money + ? WHERE guid = ?', [copperAmount, character.guid]);
+            await executeSoapCommand(`.send money ${character.name} "Blizzard" "gracias por tu apoyo esto ayuda al servidor" ${copperAmount}`);
+            break;
+          case 'profession':
+            const skillId = Number(item.item_id);
+            const skillLevel = Number(item.service_data) || 450;
+            if (skillId > 0) {
+              await executeSoapCommand(`.set skill ${character.name} ${skillId} ${skillLevel} ${skillLevel}`);
+            }
             break;
           case 'character_transfer':
             const targetAccountId = Number(body?.targetAccountId);

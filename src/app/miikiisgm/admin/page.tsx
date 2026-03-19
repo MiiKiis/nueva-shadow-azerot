@@ -17,6 +17,7 @@ import {
   QrCode,
   X,
   Coins,
+  Edit2,
 } from 'lucide-react';
 import DarDpAdminForm from './DarDpAdminForm';
 
@@ -33,6 +34,8 @@ interface ShopItem {
   class_mask: number;
   image: string;
   soap_item_count: number;
+  service_type: string;
+  service_data: string | null;
 }
 
 interface NewItemForm {
@@ -101,6 +104,7 @@ export default function AdminShopPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_ITEM);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   // tabs
   const [activeTab, setActiveTab] = useState<AdminTab>('shop');
@@ -179,7 +183,7 @@ export default function AdminShopPage() {
     }
   };
 
-  // ── Add item ─────────────────────────────────────────────────────────────
+  // ── Add/Update item ─────────────────────────────────────────────────────
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const user = getStoredUser();
@@ -188,37 +192,36 @@ export default function AdminShopPage() {
       setError('Rellena nombre y precio.');
       return;
     }
-
+ 
     const validItems = newItem.bundleItems.filter(b => b.id.trim() !== '');
     if (validItems.length === 0 && newItem.serviceType === 'none') {
        setError('Añade al menos un Item ID.');
        return;
     }
-
+ 
     setLoading(true);
     setError('');
-
+ 
     let finalServiceType = newItem.serviceType;
     let finalServiceData = newItem.serviceData;
     let finalItemId = 0;
-
+ 
     if (validItems.length > 1) {
        finalServiceType = 'bundle';
        finalServiceData = JSON.stringify(validItems.map(b => ({ id: Number(b.id), count: Number(b.count) })));
-       // for bundles, item_id in db can be 0 (meaning complex item)
     } else if (validItems.length === 1) {
        finalItemId = Number(validItems[0].id);
-       // we leave finalServiceType as what they picked (none, level_boost, etc.)
     } else {
-       // length === 0, but maybe they picked a service without items like gold pack
        finalItemId = 0;
     }
-
+ 
     try {
+      const isEditing = editingId !== null;
       const res = await fetch('/api/admin/shop', {
-        method: 'POST',
+        method: isEditing ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingId,
           userId: user.id,
           name: newItem.name.trim(),
           itemId: finalItemId,
@@ -234,18 +237,60 @@ export default function AdminShopPage() {
           serviceData: finalServiceData,
         }),
       });
-
+ 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al guardar item');
-
+ 
       setNewItem(EMPTY_ITEM);
+      setEditingId(null);
       await fetchItems();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Error de conexión al agregar item';
+      const message = err instanceof Error ? err.message : 'Error de conexión al guardar item';
       setError(message);
     } finally {
       setLoading(false);
     }
+  };
+ 
+  // ── Edit Click ───────────────────────────────────────────────────────────
+  const handleEditClick = (item: ShopItem) => {
+    setEditingId(item.id);
+    setError('');
+ 
+    let bundle: { id: string; count: string }[] = [{ id: String(item.item_id), count: String(item.soap_item_count || 1) }];
+    if (item.service_type === 'bundle' && item.service_data) {
+       try {
+          const parsed = JSON.parse(item.service_data);
+          if (Array.isArray(parsed)) {
+             bundle = parsed.map(p => ({ id: String(p.id || p.item_id), count: String(p.count || 1) }));
+          }
+       } catch { /* use single */ }
+    }
+ 
+    setNewItem({
+      name: item.name,
+      itemId: String(item.item_id),
+      price: String(item.price),
+      currency: item.currency,
+      category: item.category,
+      quality: item.quality,
+      tier: String(item.tier),
+      classMask: String(item.class_mask),
+      image: item.image,
+      soapCount: String(item.soap_item_count),
+      serviceType: item.service_type,
+      serviceData: item.service_data || '',
+      bundleItems: bundle,
+    });
+ 
+    // scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+ 
+  const cancelEdit = () => {
+    setEditingId(null);
+    setNewItem(EMPTY_ITEM);
+    setError('');
   };
 
   // ── Delete item ──────────────────────────────────────────────────────────
@@ -420,9 +465,23 @@ export default function AdminShopPage() {
           <div className="space-y-8">
             {/* Add item form */}
             <div className="rounded-2xl border border-cyan-100/10 bg-[#060a13]/75 backdrop-blur-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
-              <h2 className="text-xl font-black mb-5 flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-cyan-400" /> Agregar Item
-              </h2>
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-xl font-black flex items-center gap-2">
+                  {editingId ? (
+                    <><Edit2 className="w-5 h-5 text-cyan-400" /> Modificar Item #{editingId}</>
+                  ) : (
+                    <><PlusCircle className="w-5 h-5 text-cyan-400" /> Agregar Item</>
+                  )}
+                </h2>
+                {editingId && (
+                  <button
+                    onClick={cancelEdit}
+                    className="text-xs font-bold text-gray-400 hover:text-white flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <X className="w-3" /> CANCELAR EDICIÓN
+                  </button>
+                )}
+              </div>
               <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Name */}
                 <div className="lg:col-span-2">
@@ -440,8 +499,8 @@ export default function AdminShopPage() {
                 <div className="lg:col-span-3 border border-purple-500/20 bg-black/20 p-4 rounded-xl space-y-3">
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                      Item ID(s) *
-                      <span className="text-gray-500 lowercase ml-2 normal-case font-normal">(Añade más de uno para crear un Set o Pack automáticamente por el mismo costo)</span>
+                      Item ID(s) / ID de Profesión *
+                      <span className="text-gray-500 lowercase ml-2 normal-case font-normal">(Si es profesión, usa el ID de la skill en AzerothCore (ej: 171))</span>
                     </label>
                     <button 
                       type="button"
@@ -559,6 +618,7 @@ export default function AdminShopPage() {
                     <option value="faction_change">Cambio de Facción</option>
                     <option value="level_boost">Instant Level Boost</option>
                     <option value="gold_pack">Pack de Oro</option>
+                    <option value="profession">Profesión (Skill)</option>
                     <option value="character_transfer">Transferencia de Cuenta</option>
                   </select>
                 </div>
@@ -569,11 +629,12 @@ export default function AdminShopPage() {
                     <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">
                       {newItem.serviceType === 'level_boost' ? 'Nivel Objetivo (60, 70, etc)' :
                        newItem.serviceType === 'gold_pack' ? 'Cantidad de Oro' :
+                       newItem.serviceType === 'profession' ? 'Nivel de Profesión (ej: 450)' :
                        'Datos adicionales (opcional)'}
                     </label>
                     <input
                       type="text"
-                      placeholder="Ej: 70"
+                      placeholder={newItem.serviceType === 'profession' ? "Ej: 450" : "Ej: 70"}
                       value={newItem.serviceData}
                       onChange={e => setNewItem(p => ({ ...p, serviceData: e.target.value }))}
                       className="w-full bg-[#03060d]/80 border border-pink-500/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-pink-400/60"
@@ -711,9 +772,19 @@ export default function AdminShopPage() {
                         : 'bg-gradient-to-r from-purple-700 to-cyan-700 hover:from-purple-600 hover:to-cyan-600'
                     }`}
                   >
-                    <PlusCircle className="w-4 h-4" />
-                    {loading ? 'Guardando...' : 'Agregar a la Tienda'}
+                    {editingId ? <Edit2 className="w-4 h-4" /> : <PlusCircle className="w-4 h-4" />}
+                    {loading ? 'Guardando...' : editingId ? 'Guardar Cambios' : 'Agregar a la Tienda'}
                   </button>
+                  
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="px-8 py-3.5 rounded-xl font-bold text-sm bg-white/5 border border-white/10 hover:bg-white/10 transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  )}
                 </div>
               </form>
             </div>
@@ -759,13 +830,22 @@ export default function AdminShopPage() {
                           <td className="py-3 uppercase text-xs">{item.category}</td>
                           <td className="py-3">{item.tier}</td>
                           <td className="py-3">
-                            <button
-                              onClick={() => handleDelete(item.id)}
-                              className="p-2 rounded-lg bg-rose-900/30 text-rose-400 hover:bg-rose-700/50 hover:text-white transition-colors"
-                              title="Eliminar item"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditClick(item)}
+                                className="p-2 rounded-lg bg-cyan-900/30 text-cyan-400 hover:bg-cyan-700/50 hover:text-white transition-colors"
+                                title="Editar item"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                className="p-2 rounded-lg bg-rose-900/30 text-rose-400 hover:bg-rose-700/50 hover:text-white transition-colors"
+                                title="Eliminar item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}

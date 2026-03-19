@@ -128,9 +128,37 @@ export default function DonatePage() {
   const [purchaseError, setPurchaseError] = useState<string>('');
   const [purchasingItemId, setPurchasingItemId] = useState<number | null>(null);
   const [creatingCryptoInvoice, setCreatingCryptoInvoice] = useState(false);
+  const [processingStripe, setProcessingStripe] = useState(false);
   // Definir activeTab para evitar error
   const [activeTab, setActiveTab] = useState<'rewards' | 'donations'>('rewards');
   const [targetAccountId, setTargetAccountId] = useState<string>('');
+
+  const handleStripeCheckout = async () => {
+    if (!user || !selectedDonation) return;
+    setProcessingStripe(true);
+    try {
+      const res = await fetch('/api/payments/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          username: user.username,
+          amount: selectedDonation.amount,
+          points: selectedDonation.points,
+          plan: selectedDonation.plan
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error procesando pago con Stripe');
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setProcessingStripe(false);
+    }
+  };
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -208,6 +236,11 @@ export default function DonatePage() {
       if (isGift) {
         setGiftPin('');
       }
+
+      // Redirigir al panel de administrador después de una compra exitosa
+      setTimeout(() => {
+        router.push('/miikiisgm/admin');
+      }, 2000);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al procesar la compra';
       setPurchaseError(message);
@@ -777,10 +810,23 @@ export default function DonatePage() {
             </div>
             <div className="p-6 bg-black/40 border border-red-400/30 rounded-lg flex flex-col items-center">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2"><rect width="48" height="48" rx="12" fill="#E51C23" /><rect x="8" y="16" width="32" height="16" rx="4" fill="#fff" /><rect x="12" y="20" width="8" height="8" rx="2" fill="#F3BA2F" /><rect x="28" y="20" width="8" height="8" rx="2" fill="#0070BA" /></svg>
-              <div className="font-black text-2xl mb-1">Tarjeta de crédito</div>
-              <div className="text-red-300 font-bold mb-2">Visa, MasterCard</div>
-              <div className="text-gray-400 text-sm mb-4 text-center">Solicita el enlace de pago al staff.</div>
-              <button className="bg-red-400 text-black font-bold px-6 py-3 rounded-lg">Solicitar enlace</button>
+              <div className="font-black text-2xl mb-1">Tarjeta de Crédito</div>
+              <div className="text-red-300 font-bold mb-2">Visa, MasterCard, Amex</div>
+              <div className="text-gray-400 text-sm mb-4 text-center">Pago 100% seguro procesado por Stripe.</div>
+              <button 
+                onClick={() => handleStripeCheckout()}
+                disabled={processingStripe}
+                className={`bg-red-500 hover:bg-red-400 text-white font-bold px-6 py-3 rounded-lg w-full transition-all flex items-center justify-center gap-2 ${processingStripe ? 'opacity-70 cursor-not-allowed' : ''}`}
+              >
+                {processingStripe ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Procesando...
+                  </>
+                ) : (
+                  'Pagar con Tarjeta'
+                )}
+              </button>
             </div>
             <div className="p-6 bg-black/40 border border-green-400/30 rounded-lg flex flex-col items-center">
               <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="mb-2"><rect width="48" height="48" rx="12" fill="#43A047" /><rect x="12" y="12" width="24" height="24" rx="4" fill="#fff" /><rect x="16" y="16" width="4" height="4" fill="#43A047" /><rect x="28" y="16" width="4" height="4" fill="#43A047" /><rect x="16" y="28" width="4" height="4" fill="#43A047" /><rect x="28" y="28" width="4" height="4" fill="#43A047" /><rect x="22" y="22" width="4" height="4" fill="#43A047" /></svg>

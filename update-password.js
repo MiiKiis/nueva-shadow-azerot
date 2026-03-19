@@ -3,15 +3,16 @@
  * Ejecutar: node update-password.js
  */
 
-import mysql from 'mysql2/promise';
-import crypto from 'crypto';
+require('dotenv').config({ path: '.env.local' });
+const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 
 const DB_CONFIG = {
-  host: 'localhost',
-  port: 3306,
-  user: 'blizzcms',
-  password: 'teamoevelin2026',
-  database: 'acore_auth',
+  host: process.env.DB_HOST || '127.0.0.1',
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER || 'blizzcms',
+  password: process.env.DB_PASSWORD || process.env.DB_PASS || '',
+  database: process.env.DB_AUTH || 'acore_auth',
 };
 
 // SRP6 Prime (N) - Standard for WoW 3.3.5a
