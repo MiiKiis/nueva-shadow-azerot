@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authPool } from '@/lib/db';
+import { authPool, cmsPool } from '@/lib/db';
 
 type AdminCheckResult = {
   ok: boolean;
@@ -13,6 +13,16 @@ async function assertAdmin(userId: number): Promise<AdminCheckResult> {
   }
 
   try {
+    // 1. Chequear BlizzCMS primero
+    const [cmsRows]: any = await cmsPool.query(
+      'SELECT role FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    if (cmsRows?.[0]?.role === 1) {
+      return { ok: true };
+    }
+
+    // 2. Fallback a AzerothCore (usando id en vez de AccountID)
     const [rows]: any = await authPool.query(
       'SELECT MAX(gmlevel) AS gmlevel FROM account_access WHERE id = ?',
       [userId]

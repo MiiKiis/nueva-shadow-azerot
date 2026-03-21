@@ -29,7 +29,7 @@ export async function POST(req: Request) {
             product_data: {
               name: `${points} Créditos DP (${plan})`,
               description: `Compra de ${points} DP (Donation Points) para la cuenta: ${username} (ID: ${userId})`,
-              images: ['https://shadow-azeroth.vercel.app/coin.png'], // Add your logo or coin icon URL
+              images: [`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/coin.png`],
             },
             unit_amount: Math.round(amount * 100), // Stripe expects amounts in cents
           },

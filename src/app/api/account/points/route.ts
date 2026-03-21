@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authPool } from '@/lib/db';
+import { authPool, cmsPool } from '@/lib/db';
 
 export async function GET(request: Request) {
   try {
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'accountId invalido' }, { status: 400 });
     }
 
-    let rows, accessRows;
+    let rows, accessRows, cmsRows;
     try {
       rows = ((await (authPool as any).query(
         'SELECT id, vp, dp FROM account WHERE id = ? LIMIT 1',
@@ -18,6 +18,15 @@ export async function GET(request: Request) {
       )) as any[])[0];
     } catch (dbError: any) {
       return NextResponse.json({ error: 'Error en consulta account', details: dbError.message, code: dbError.code }, { status: 500 });
+    }
+
+    try {
+      cmsRows = ((await (cmsPool as any).query(
+        'SELECT role FROM users WHERE id = ? LIMIT 1',
+        [accountId]
+      )) as any[])[0];
+    } catch (dbError: any) {
+      console.warn('CmsPool error getting role:', dbError.message);
     }
 
     try {
@@ -36,7 +45,14 @@ export async function GET(request: Request) {
     const row = rows[0];
     const dp = Number(row.dp || 0);
     const vp = Number(row.vp || 0);
-    const gmlevel = Number(accessRows?.[0]?.gmlevel || 0);
+    
+    let gmlevel = Number(accessRows?.[0]?.gmlevel || 0);
+    const roleDb = Number(cmsRows?.[0]?.role || 0);
+    
+    if (roleDb === 1 && gmlevel < 3) {
+      gmlevel = 3; // Role 1 en blizzcms equivale a nivel 3+ en juego 
+    }
+
     const role = gmlevel > 0 ? 'GM' : 'ADALID';
 
     return NextResponse.json({

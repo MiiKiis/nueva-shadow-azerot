@@ -49,13 +49,13 @@ export default function DisclaimerPage() {
           <section className="p-8 bg-black/60 border border-purple-900/30 rounded-sm backdrop-blur-md">
             <h2 className="text-2xl font-black text-purple-600 mb-4 uppercase tracking-wide">Donaciones vs. Compras</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-4">
-              <strong>IMPORTANTE:</strong> Todo lo mencionado como "donación" en Shadow Azeroth es una contribución voluntaria 
+              <strong>IMPORTANTE:</strong> Todo lo mencionado como &quot;donación&quot; en Shadow Azeroth es una contribución voluntaria 
               para ayudar a mantener la infraestructura del servidor (VPS, ancho de banda, costos operacionales), 
               <strong>NO</strong> es una transacción comercial de compra de artículos o servicios.
             </p>
             <p className="text-gray-400 text-sm leading-relaxed">
-              Nunca utilizamos términos como "Tienda", "Comprar", "Vender" u otros vocablos comerciales. 
-              Toda actividad se realiza bajo el término "Recompensas de Donación" para clarificar que es un acto voluntario de apoyo, 
+              Nunca utilizamos términos como &quot;Tienda&quot;, &quot;Comprar&quot;, &quot;Vender&quot; u otros vocablos comerciales. 
+              Toda actividad se realiza bajo el término &quot;Recompensas de Donación&quot; para clarificar que es un acto voluntario de apoyo, 
               no una venta.
             </p>
           </section>
@@ -66,7 +66,7 @@ export default function DisclaimerPage() {
             <p className="text-gray-400 text-sm leading-relaxed">
               Todos los nombres, logotipos, imágenes en movimiento, iconos, software, código fuente, y cualquier otro contenido 
               relacionado con World of Warcraft son propiedad de Blizzard Entertainment, Inc. Nos abstenemos completamente de 
-              utilizar el logotipo exacto de "Wrath of the Lich King" y todos sus bordes distintivos de Blizzard. 
+              utilizar el logotipo exacto de &quot;Wrath of the Lich King&quot; y todos sus bordes distintivos de Blizzard. 
               En su lugar, utilizamos fuentes similares y diseño original que no infringen derechos de autor.
             </p>
           </section>

@@ -21,6 +21,24 @@ import {
 } from 'lucide-react';
 import DarDpAdminForm from './DarDpAdminForm';
 
+// ── Constants ──────────────────────────────────────────────────────────────────
+const PROFESSIONS_LIST = [
+  { id: 171, name: 'Alquimia' },
+  { id: 164, name: 'Herrería' },
+  { id: 333, name: 'Encantamiento' },
+  { id: 202, name: 'Ingeniería' },
+  { id: 182, name: 'Herboristería' },
+  { id: 773, name: 'Inscripción' },
+  { id: 755, name: 'Joyería' },
+  { id: 165, name: 'Peletería' },
+  { id: 186, name: 'Minería' },
+  { id: 393, name: 'Desuello' },
+  { id: 197, name: 'Sastrería' },
+  { id: 356, name: 'Pesca' },
+  { id: 185, name: 'Cocina' },
+  { id: 129, name: 'Primeros Auxilios' },
+];
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ShopItem {
   id: number;
@@ -123,15 +141,19 @@ export default function AdminShopPage() {
         headers: { 'Content-Type': 'application/json' },
       });
 
-      if (res.status === 401 || res.status === 403) { router.push('/'); return; }
+      if (res.status === 401 || res.status === 403) { router.push('/dashboard'); return; }
+
+      // Llegados aquí, el check de GM pasó sin dar 401/403.
+      setIsAllowed(true);
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo cargar la tienda');
 
       setItems(Array.isArray(data.items) ? data.items : []);
-      setIsAllowed(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error cargando la tienda';
+      // Mantiene isAllowed pero muestra error real en la UI
+      setIsAllowed(true); 
       setError(message);
     } finally {
       setFetchLoading(false);
@@ -149,7 +171,18 @@ export default function AdminShopPage() {
       return;
     }
     setStoredUsername(user.username || '');
-    setCheckingAuth(false);
+    
+    // Verificación silenciosa de GM para rebotar cuentas normales
+    fetch(`/api/account/points?accountId=${user.id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.gmlevel || Number(data.gmlevel) < 3) {
+          router.replace('/dashboard');
+        } else {
+          setCheckingAuth(false);
+        }
+      })
+      .catch(() => router.replace('/dashboard'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -499,16 +532,17 @@ export default function AdminShopPage() {
                 <div className="lg:col-span-3 border border-purple-500/20 bg-black/20 p-4 rounded-xl space-y-3">
                   <div className="flex justify-between items-center mb-1">
                     <label className="block text-xs text-gray-400 font-semibold uppercase tracking-wider">
-                      Item ID(s) / ID de Profesión *
-                      <span className="text-gray-500 lowercase ml-2 normal-case font-normal">(Si es profesión, usa el ID de la skill en AzerothCore (ej: 171))</span>
+                      {newItem.serviceType === 'none' || newItem.serviceType === 'bundle' ? 'Item ID(s) *' : 'ID Visual / Referencia (Opcional)'}
                     </label>
-                    <button 
-                      type="button"
-                      onClick={() => setNewItem(p => ({ ...p, bundleItems: [...p.bundleItems, { id: '', count: '1' }] }))}
-                      className="bg-purple-900/40 hover:bg-purple-600 text-purple-200 font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-colors border border-purple-500/30"
-                    >
-                      + Añadir otro ítem
-                    </button>
+                    {(newItem.serviceType === 'none' || newItem.serviceType === 'bundle') && (
+                      <button 
+                        type="button"
+                        onClick={() => setNewItem(p => ({ ...p, bundleItems: [...p.bundleItems, { id: '', count: '1' }] }))}
+                        className="bg-purple-900/40 hover:bg-purple-600 text-purple-200 font-bold text-[10px] uppercase px-3 py-1.5 rounded-lg transition-colors border border-purple-500/30"
+                      >
+                        + Añadir otro ítem
+                      </button>
+                    )}
                   </div>
                   <div className="space-y-2">
                     {newItem.bundleItems.map((bi, idx) => (
@@ -516,7 +550,7 @@ export default function AdminShopPage() {
                         <div className="flex-1">
                           <input
                             type="number"
-                            placeholder="Ej: 49623"
+                            placeholder={newItem.serviceType === 'profession' ? "ID de la Profesión (Ej: 171)" : "Ej: 49623"}
                             value={bi.id}
                             onChange={(e) => {
                               const nb = [...newItem.bundleItems];
@@ -524,10 +558,10 @@ export default function AdminShopPage() {
                               setNewItem({ ...newItem, bundleItems: nb });
                             }}
                             className="w-full bg-[#03060d]/80 border border-purple-500/30 rounded-lg px-3 py-2.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
-                            required
+                            required={newItem.serviceType === 'none' || newItem.serviceType === 'bundle'}
                           />
                         </div>
-                        {newItem.bundleItems.length > 1 && (
+                        {(newItem.serviceType === 'none' || newItem.serviceType === 'bundle') && newItem.bundleItems.length > 1 && (
                           <div className="w-20">
                             <input
                               type="number"
@@ -544,7 +578,7 @@ export default function AdminShopPage() {
                             />
                           </div>
                         )}
-                        {newItem.bundleItems.length > 1 && (
+                        {(newItem.serviceType === 'none' || newItem.serviceType === 'bundle') && newItem.bundleItems.length > 1 && (
                           <button
                             type="button"
                             onClick={() => {
@@ -609,7 +643,41 @@ export default function AdminShopPage() {
                   <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">Tipo de Servicio</label>
                   <select
                     value={newItem.serviceType}
-                    onChange={e => setNewItem(p => ({ ...p, serviceType: e.target.value }))}
+                    onChange={e => {
+                      const st = e.target.value;
+                      let cat = newItem.category;
+                      let img = newItem.image;
+                      let sData = newItem.serviceData;
+                      let bItems = newItem.bundleItems;
+                      
+                      // Auto-suggestion for categories and images
+                      if (st === 'gold_pack') { 
+                        cat = 'oro'; 
+                        img = 'inv_misc_coin_02'; 
+                        bItems = [{ id: '', count: '1' }]; 
+                      }
+                      else if (st === 'level_boost') { 
+                        cat = 'boost'; 
+                        img = 'spell_holy_blessingofstrength'; 
+                        bItems = [{ id: '', count: '1' }]; 
+                      }
+                      else if (st === 'profession') { 
+                        cat = 'profesiones'; 
+                        bItems = [{ id: '', count: '1' }]; 
+                      }
+                      else if (st === 'none' || st === 'bundle') {
+                        sData = '';
+                      }
+                      
+                      setNewItem(p => ({ 
+                        ...p, 
+                        serviceType: st, 
+                        category: cat, 
+                        image: img, 
+                        serviceData: sData,
+                        bundleItems: bItems 
+                      }));
+                    }}
                     className="w-full bg-[#03060d]/80 border border-purple-500/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/60"
                   >
                     <option value="none">Ninguno (Item estándar)</option>
@@ -617,28 +685,55 @@ export default function AdminShopPage() {
                     <option value="race_change">Cambio de Raza</option>
                     <option value="faction_change">Cambio de Facción</option>
                     <option value="level_boost">Instant Level Boost</option>
-                    <option value="gold_pack">Pack de Oro</option>
-                    <option value="profession">Profesión (Skill)</option>
-                    <option value="character_transfer">Transferencia de Cuenta</option>
+                    <option value="gold_pack">Pack de Oro (Instant)</option>
+                    <option value="profession">Profesión / Skill (Instant)</option>
                   </select>
                 </div>
 
-                {/* Service Data Wrapper */}
+                {/* Service Configuration Wrapper */}
                 {newItem.serviceType !== 'none' && newItem.serviceType !== 'bundle' && (
-                  <div className="lg:col-span-2">
-                    <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">
-                      {newItem.serviceType === 'level_boost' ? 'Nivel Objetivo (60, 70, etc)' :
-                       newItem.serviceType === 'gold_pack' ? 'Cantidad de Oro' :
-                       newItem.serviceType === 'profession' ? 'Nivel de Profesión (ej: 450)' :
-                       'Datos adicionales (opcional)'}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={newItem.serviceType === 'profession' ? "Ej: 450" : "Ej: 70"}
-                      value={newItem.serviceData}
-                      onChange={e => setNewItem(p => ({ ...p, serviceData: e.target.value }))}
-                      className="w-full bg-[#03060d]/80 border border-pink-500/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-pink-400/60"
-                    />
+                  <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 border border-pink-500/20 bg-pink-900/5 p-4 rounded-xl">
+                    <h3 className="md:col-span-2 text-xs font-black text-pink-400 uppercase tracking-widest border-b border-pink-500/10 pb-2 mb-2">
+                       Configuración de Servicio Instantáneo
+                    </h3>
+                    
+                    {newItem.serviceType === 'profession' && (
+                       <div>
+                         <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">Seleccionar Profesión</label>
+                         <select
+                           value={newItem.bundleItems[0]?.id || ''}
+                           onChange={(e) => {
+                             const tid = e.target.value;
+                             const prof = PROFESSIONS_LIST.find(p => String(p.id) === tid);
+                             // If profession selected, auto-set name if empty
+                             const newName = !newItem.name || PROFESSIONS_LIST.some(p => p.name === newItem.name) ? (prof?.name || '') : newItem.name;
+                             setNewItem(p => ({ ...p, name: newName, bundleItems: [{ id: tid, count: '1' }] }));
+                           }}
+                           className="w-full bg-[#03060d]/80 border border-pink-500/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-pink-400/60"
+                         >
+                           <option value="">-- Seleccionar --</option>
+                           {PROFESSIONS_LIST.map(prof => (
+                             <option key={prof.id} value={prof.id}>{prof.name}</option>
+                           ))}
+                         </select>
+                       </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">
+                        {newItem.serviceType === 'level_boost' ? 'Nivel Final (Ej: 80)' :
+                         newItem.serviceType === 'gold_pack' ? 'Cantidad de Oro' :
+                         newItem.serviceType === 'profession' ? 'Nivel de Habilidad (Ej: 450)' :
+                         'Valor del Servicio'}
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="Ej: 450"
+                        value={newItem.serviceData}
+                        onChange={e => setNewItem(p => ({ ...p, serviceData: e.target.value }))}
+                        className="w-full bg-[#03060d]/80 border border-pink-500/30 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:ring-2 focus:ring-pink-400/60"
+                      />
+                    </div>
                   </div>
                 )}
 

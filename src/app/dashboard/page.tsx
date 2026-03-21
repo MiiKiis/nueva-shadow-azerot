@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User, Shield, Sword, Sparkles, LogOut, Swords, Skull, CreditCard, X, Check, ChevronLeft, ChevronRight, BookOpen, ChevronDown, History, KeyRound } from 'lucide-react';
+import { User, Shield, Sword, Sparkles, LogOut, Swords, Skull, CreditCard, X, Check, ChevronLeft, ChevronRight, BookOpen, ChevronDown, History, KeyRound, ShieldAlert, RefreshCw } from 'lucide-react';
 
 const raceMap: Record<number, string> = {
   1: 'Humano', 2: 'Orco', 3: 'Enano', 4: 'Elfo de la Noche', 5: 'No-Muerto',
@@ -116,6 +116,12 @@ export default function Dashboard() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinPasswordInput, setPinPasswordInput] = useState('');
+  const [pinInput, setPinInput] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
+  const [pinError, setPinError] = useState('');
+  const [pinSuccess, setPinSuccess] = useState('');
   const [pointsData, setPointsData] = useState<{ vp: number; dp: number; gmlevel?: number } | null>(null);
 
   const getClassIconSrc = (classId: number) => classIconMap[classId] || '/clases/warrior.png';
@@ -168,16 +174,15 @@ export default function Dashboard() {
         const charactersData = await charactersRes.json();
         const avatarData = await avatarRes.json();
         const pointsJson = await pointsRes.json();
-        setCharacters(charactersData);
-        setAvatar(avatarData.avatar || null);
-        setAvatarOptions(Array.isArray(avatarData.options) ? avatarData.options : []);
-        setAvatarEditableAlways(!!avatarData.editableAlways);
-        setAvatarChangeCostDp(Number(avatarData.changeCostDp || 1));
-        setPointsData(pointsJson);
 
-        if (charactersData.characters) {
-          setCharacters(charactersData.characters);
-        }
+        // Defensive: API returns { characters: [...] }, guard against error shapes
+        const charsArray = Array.isArray(charactersData?.characters)
+          ? charactersData.characters
+          : Array.isArray(charactersData)
+          ? charactersData
+          : [];
+        setCharacters(charsArray);
+        setPointsData(pointsJson);
 
         setAvatarOptions(avatarData.avatars || []);
         setAvatar(avatarData.selectedAvatar || null);
@@ -197,9 +202,27 @@ export default function Dashboard() {
     fetchDashboardData();
   }, [router]);
 
-  const handleLogout = () => {
+  const logout = () => {
     localStorage.removeItem('user');
+    setUser(null);
     router.push('/');
+  };
+
+  const SKILL_WOWHEAD_MAP: Record<number, number> = {
+    171: 51304, // Alquimia
+    164: 51300, // Herrería
+    333: 51313, // Encantamiento
+    202: 51306, // Ingeniería
+    182: 50300, // Herboristería
+    773: 51311, // Inscripción
+    755: 51311, // Jewelcrafting
+    165: 51302, // Peletería
+    186: 50310, // Minería
+    393: 50305, // Desuello
+    197: 51309, // Sastrería
+    356: 51294, // Pesca
+    185: 51296, // Cocina
+    129: 45542, // Primeros Auxilios
   };
 
   const openAvatarModal = () => {
@@ -256,6 +279,57 @@ export default function Dashboard() {
     setConfirmPassword('');
     setSecurityPin('');
     setIsPasswordModalOpen(true);
+  };
+
+  const openPinModal = () => {
+    setAccountMenuOpen(false);
+    setPinError('');
+    setPinSuccess('');
+    setPinPasswordInput('');
+    setPinInput('');
+    setIsPinModalOpen(true);
+  };
+
+  const submitPinChange = async () => {
+    if (!user || pinSaving) return;
+    setPinError('');
+    setPinSuccess('');
+
+    if (!pinPasswordInput || !pinInput) {
+      setPinError('Completa todos los campos.');
+      return;
+    }
+
+    if (!/^\d{4}$/.test(pinInput.trim())) {
+      setPinError('El Nuevo PIN debe tener exactamente 4 dígitos.');
+      return;
+    }
+
+    setPinSaving(true);
+    try {
+      const res = await fetch('/api/account/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accountId: user.id,
+          password: pinPasswordInput,
+          newPin: pinInput.trim()
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'No se pudo actualizar el PIN');
+      }
+
+      setPinSuccess('¡PIN actualizado correctamente! Ya puedes realizar compras.');
+      setTimeout(() => setIsPinModalOpen(false), 2000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error al cambiar PIN';
+      setPinError(message);
+    } finally {
+      setPinSaving(false);
+    }
   };
 
   const submitPasswordChange = async () => {
@@ -431,7 +505,7 @@ export default function Dashboard() {
             </Link>
             <button 
               type="button"
-              onClick={handleLogout}
+              onClick={logout}
               className="inline-flex h-12 items-center gap-2 px-6 bg-gradient-to-r from-[#1a0909] to-[#2a0d0f] border border-[#8b2e35]/70 text-[#f2c4c8] hover:text-white hover:border-[#b33a44] text-xs font-black uppercase tracking-[0.2em] transition-all rounded-2xl shadow-[0_0_18px_rgba(139,46,53,0.28)] hover:shadow-[0_0_30px_rgba(179,58,68,0.5)]"
             >
               <LogOut className="w-4 h-4" />
@@ -536,6 +610,14 @@ export default function Dashboard() {
                     >
                       <KeyRound className="w-4 h-4 text-cyan-300" />
                       Cambiar contraseña
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openPinModal}
+                      className="w-full px-3 py-3 text-left text-[11px] font-bold uppercase tracking-[0.18em] text-cyan-300 hover:text-cyan-100 hover:bg-purple-800/25 transition-colors flex items-center gap-2 border-t border-purple-900/40"
+                    >
+                      <ShieldAlert className="w-4 h-4 text-purple-400" />
+                      Configurar PIN de Tienda
                     </button>
                   </div>
                 )}
@@ -851,15 +933,34 @@ export default function Dashboard() {
                     {purchaseHistory.map((purchase) => (
                       <a 
                         key={purchase.id}
-                        href={purchase.item_id ? `https://www.wowhead.com/wotlk/item=${purchase.item_id}` : '#'}
-                        data-wowhead={purchase.item_id ? `item=${purchase.item_id}&domain=wotlk` : ''}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+                        }}
+                        href={
+                          purchase.service_type === 'profession'
+                            ? `https://www.wowhead.com/wotlk/spell=${SKILL_WOWHEAD_MAP[Number(purchase.item_id)] || purchase.item_id}`
+                            : purchase.service_type === 'level_boost' || purchase.service_type === 'gold_pack'
+                            ? '#'
+                            : `https://www.wowhead.com/wotlk/item=${purchase.item_id}`
+                        }
+                        data-wowhead={
+                          purchase.service_type === 'level_boost' || purchase.service_type === 'gold_pack'
+                            ? 'disabled'
+                            : purchase.service_type === 'profession'
+                            ? `spell=${SKILL_WOWHEAD_MAP[Number(purchase.item_id)] || purchase.item_id}&domain=wotlk`
+                            : `item=${purchase.item_id}&domain=wotlk`
+                        }
                         target="_blank"
-                        rel="noopener"
+                        rel="noopener noreferrer"
                         className="grid grid-cols-[90px_1fr_120px_140px] items-center px-4 py-3 border-t border-white/10 text-sm text-slate-200 hover:bg-white/5 transition-colors group"
                       >
                         <span className="text-xs font-black text-cyan-300">#{purchase.item_id}</span>
                         <div className="min-w-0">
-                          <p className="font-semibold truncate group-hover:text-cyan-300 transition-colors">{purchase.item_name || 'Item sin nombre'}</p>
+                          <p className="font-semibold truncate">
+                            <span className="font-black text-white hover:text-cyan-400 transition-colors">
+                              {purchase.item_name || 'Item sin nombre'}
+                            </span>
+                          </p>
                           <p className="text-[11px] text-slate-400">{purchase.character_name || 'Sin personaje'}{purchase.is_gift ? ' • Regalo' : ''}</p>
                         </div>
                         <span className="text-right font-bold text-amber-300">{purchase.price} {purchase.currency.toUpperCase()}</span>
@@ -962,6 +1063,84 @@ export default function Dashboard() {
                   className="h-10 px-4 rounded-xl border border-cyan-200/40 bg-cyan-400/20 text-cyan-100 hover:bg-cyan-400/30 text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {passwordSaving ? 'Guardando...' : 'Guardar contraseña'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- PIN Modal --- */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="bg-[#0a0707] border border-cyan-800/40 w-full max-w-md rounded-sm overflow-hidden shadow-2xl relative flex flex-col scale-100 opacity-100">
+            {/* Header */}
+            <div className="p-5 border-b border-cyan-900/30 flex items-center justify-between">
+              <h3 className="text-xl font-black text-cyan-300 italic tracking-widest uppercase flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-purple-400" /> Configurar PIN
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsPinModalOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors"
+                disabled={pinSaving}
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+              <p className="text-xs text-slate-300 uppercase tracking-widest font-bold leading-relaxed">
+                El PIN protegerá tus créditos al comprar Regalos.
+              </p>
+
+              {pinError && (
+                <div className="p-3 bg-red-900/20 border border-red-500/30 rounded text-red-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                  {pinError}
+                </div>
+              )}
+              {pinSuccess && (
+                <div className="p-3 bg-emerald-900/20 border border-emerald-500/30 rounded text-emerald-400 text-[10px] font-bold uppercase tracking-[0.2em] text-center">
+                  {pinSuccess}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-400">Contraseña de la cuenta</label>
+                  <input
+                    type="password"
+                    value={pinPasswordInput}
+                    onChange={(e) => setPinPasswordInput(e.target.value)}
+                    disabled={pinSaving || !!pinSuccess}
+                    className="w-full h-11 rounded-sm border border-cyan-900/40 bg-black px-3 text-sm text-white focus:border-cyan-300/60 focus:outline-none placeholder-cyan-900/50"
+                    placeholder="Tu contraseña actual..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold uppercase tracking-[0.2em] text-purple-300">NUEVO PIN (4 DÍGITOS)</label>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
+                    disabled={pinSaving || !!pinSuccess}
+                    className="w-full h-14 rounded-sm border border-purple-900/40 bg-[#0f0a0a] px-3 text-white text-3xl tracking-[0.5em] text-center font-bold font-mono focus:border-purple-500/50 focus:outline-none placeholder-purple-900/30"
+                    placeholder="1234"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={submitPinChange}
+                  disabled={pinSaving || !!pinSuccess || pinInput.length !== 4 || !pinPasswordInput}
+                  className="flex-1 h-12 bg-cyan-600/20 border border-cyan-500/50 text-cyan-300 text-[11px] font-black hover:bg-cyan-500/40 hover:text-white hover:border-cyan-400 transition-all rounded-sm disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-[0.2em] flex items-center justify-center gap-2"
+                >
+                  {pinSaving ? 'Guardando...' : 'GUARDAR PIN'}
                 </button>
               </div>
             </div>

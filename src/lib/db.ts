@@ -12,7 +12,6 @@ const pool = mysql.createPool({
   user: DB_USER,
   password: DB_PASS,
   database: process.env.DB_CHARACTERS || 'acore_characters',
-  // Forzamos conexión TCP por host/port, sin socket local
   socketPath: undefined,
   waitForConnections: true,
   connectionLimit: 10,
@@ -26,7 +25,19 @@ export const authPool = mysql.createPool({
   user: DB_USER,
   password: DB_PASS,
   database: process.env.DB_AUTH || 'acore_auth',
-  // Forzamos conexión TCP por host/port, sin socket local
+  socketPath: undefined,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
+
+// Pool para la base de datos del CMS (blizzcms - tablas internas: users, shop, etc.)
+export const cmsPool = mysql.createPool({
+  host: DB_HOST,
+  port: DB_PORT,
+  user: DB_USER,
+  password: DB_PASS,
+  database: process.env.DB_CMS || 'blizzcms',
   socketPath: undefined,
   waitForConnections: true,
   connectionLimit: 10,

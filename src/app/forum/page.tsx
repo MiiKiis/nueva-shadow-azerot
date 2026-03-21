@@ -571,7 +571,7 @@ export default function ForumPage() {
               <div className="space-y-2 text-xs">
                 <Link href="/armory" className="flex items-center gap-2 text-slate-300 hover:text-white"><Sparkles className="w-3.5 h-3.5" /> Armería</Link>
                 <Link href="/donate" className="flex items-center gap-2 text-slate-300 hover:text-white"><Sparkles className="w-3.5 h-3.5" /> Tienda / Donaciones</Link>
-                <a href="https://discord.gg/Enfa9UecWK" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-300 hover:text-white"><LifeBuoy className="w-3.5 h-3.5" /> Discord</a>
+                <a href="https://discord.gg/FfPcExmrZW" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-300 hover:text-white"><LifeBuoy className="w-3.5 h-3.5" /> Discord</a>
               </div>
             </div>
           </aside>

@@ -26,10 +26,12 @@ export async function GET(request: Request) {
     }
 
     const [rows] = await authPool.query(
-      `SELECT id, account_id, item_id, item_name, currency, price, character_guid, character_name, is_gift, created_at
-       FROM shop_purchases
-       WHERE account_id = ?
-       ORDER BY id DESC
+      `SELECT p.id, p.account_id, p.item_name, p.currency, p.price, p.character_guid, p.character_name, p.is_gift, p.created_at,
+              i.item_id as item_id, i.service_type as service_type
+       FROM shop_purchases p
+       LEFT JOIN shop_items i ON p.item_id = i.id
+       WHERE p.account_id = ?
+       ORDER BY p.id DESC
        LIMIT ?`,
       [accountId, limit]
     );

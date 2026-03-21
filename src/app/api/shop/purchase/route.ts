@@ -110,7 +110,7 @@ async function sendSoapItem(params: {
   itemEntry: number;
   itemCount: number;
 }) {
-  const command = `.send items ${params.characterName} "Blizzard" "gracias por tu apoyo esto ayuda al servidor" ${params.itemEntry}:${params.itemCount}`;
+  const command = `.send items ${params.characterName} "Agradecimiento" "gracias por tu apoyo esto ayuda al servidor" ${params.itemEntry}:${params.itemCount}`;
   return executeSoapCommand(command);
 }
 
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
     await connection.beginTransaction();
 
     const [itemRows] = await connection.query(
-      'SELECT id, name, price, currency, soap_item_entry, soap_item_count, service_type, service_data FROM shop_items WHERE id = ? LIMIT 1',
+      'SELECT id, name, price, currency, item_id, soap_item_entry, soap_item_count, service_type, service_data FROM shop_items WHERE id = ? LIMIT 1',
       [itemId]
     );
     const items = itemRows as ShopItemRow[];
@@ -244,7 +244,7 @@ export async function POST(request: Request) {
             }
           }
         } catch (e) { console.error('Error parsing bundle data:', e); }
-      } else if (item.soap_item_entry) {
+      } else if (item.soap_item_entry && (!item.service_type || item.service_type === 'none')) {
         await sendSoapItem({
           characterName: character.name,
           itemEntry: Number(item.soap_item_entry),
@@ -273,13 +273,13 @@ export async function POST(request: Request) {
           case 'gold_pack':
             const goldAmount = Number(item.service_data) || 1000;
             const copperAmount = goldAmount * 10000;
-            await executeSoapCommand(`.send money ${character.name} "Blizzard" "gracias por tu apoyo esto ayuda al servidor" ${copperAmount}`);
+            await executeSoapCommand(`.send money ${character.name} "Agradecimiento" "gracias por tu apoyo esto ayuda al servidor" ${copperAmount}`);
             break;
           case 'profession':
             const skillId = Number(item.item_id);
             const skillLevel = Number(item.service_data) || 450;
             if (skillId > 0) {
-              await executeSoapCommand(`.set skill ${character.name} ${skillId} ${skillLevel} ${skillLevel}`);
+              await executeSoapCommand(`.setskill ${character.name} ${skillId} ${skillLevel} ${skillLevel}`);
             }
             break;
           case 'character_transfer':

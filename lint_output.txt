@@ -1,0 +1,324 @@
+
+> pagina@0.1.0 lint
+> eslint
+
+
+D:\azerothcore\pagina\alter-forum-category.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\check-columns.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\check-db.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\check-gm.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\check-pin-table.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\create-admin-db.js
+  1:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:16  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\create-forum-tables.js
+  2:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\create-shop-table.js
+  2:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\find-char.js
+  1:1   error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\lib\bizzcms.ts
+  56:5   warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-unsafe-assignment')
+  57:58  error    Unexpected any. Specify a different type                                                                    @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\reset-srp6-password.js
+  1:15  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  2:16  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+  3:12  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\src\app\addons\page.tsx
+  4:18  warning  'Flame' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\azerothcore\pagina\src\app\api\account\password\route.ts
+   44:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   64:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  106:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\account\points\route.ts
+  15:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  18:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  19:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  24:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:13  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  50:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\account\purchases\route.ts
+  38:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\addons\route.ts
+  6:5  error  'addons' is never reassigned. Use 'const' instead  prefer-const
+
+D:\azerothcore\pagina\src\app\api\admin\give-dp\route.ts
+   6:13  warning  'userId' is assigned a value but never used  @typescript-eslint/no-unused-vars
+  17:19  error    Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  37:19  error    Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\admin\search-account\route.ts
+  13:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  31:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\admin\shop\route.ts
+   16:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   27:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  103:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  151:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  169:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  190:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  197:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\avatar\route.ts
+    6:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   45:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   81:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   94:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  127:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\characters\route.ts
+  16:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  29:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  37:14  warning  'innerError' is defined but never used    @typescript-eslint/no-unused-vars
+  37:26  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  40:25  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  45:29  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\characters\search\route.ts
+  21:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  25:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  34:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\forum\topics\[id]\comments\route.ts
+   30:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   50:35  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   70:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   80:15  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:24  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:26  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  115:21  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  124:15  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  132:13  warning  '_params' is defined but never used       @typescript-eslint/no-unused-vars
+  146:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  159:15  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  167:13  warning  '_params' is defined but never used       @typescript-eslint/no-unused-vars
+  178:26  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  187:23  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  198:15  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\forum\topics\[id]\route.ts
+    5:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   13:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   25:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   61:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   63:30  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   77:33  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  111:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  137:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  146:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  176:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:15  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\forum\topics\route.ts
+  33:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\login\route.ts
+  29:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  65:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  73:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\payments\cryptomus\invoice\route.ts
+  103:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\payments\stripe\checkout\route.ts
+  53:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\payments\stripe\webhook\route.ts
+  26:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  49:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  73:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\register\route.ts
+  115:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  117:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  123:41  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  146:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  152:31  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  176:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  188:35  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  193:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  253:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\shop\items\route.ts
+  50:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\shop\purchase\route.ts
+  169:24  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  222:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  328:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\api\stats\global\route.ts
+  26:26  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  27:28  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  42:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\dashboard\avatar\page.tsx
+   10:36  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   43:21  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+   77:19  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  112:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  177:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  199:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\azerothcore\pagina\src\app\dashboard\character\[guid]\page.tsx
+   50:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   88:46  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  105:56  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\dashboard\page.tsx
+   19:16  warning  'Shield' is defined but never used                                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  126:36  warning  'event' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  738:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  763:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\azerothcore\pagina\src\app\disclaimer\page.tsx
+  52:68  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  52:77  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:46  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:53  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:56  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:64  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:67  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  57:74  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  58:57  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  58:81  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  69:46  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  69:69  error  `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+
+D:\azerothcore\pagina\src\app\donate\page.tsx
+    3:20   warning  'CreditCard' is defined but never used                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+    3:38   warning  'TrendingUp' is defined but never used                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+    3:119  warning  'Heart' is defined but never used                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   21:7    warning  'MAX_CREDITS_PER_DOLLAR' is assigned a value but never used                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+   51:7    warning  'CLASS_COLORS' is assigned a value but never used                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+   56:7    warning  'CLASS_NAMES' is assigned a value but never used                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  106:10   warning  'isLoggedIn' is assigned a value but never used                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  106:22   warning  'setIsLoggedIn' is assigned a value but never used                                                                                                                                                                                                                                       @typescript-eslint/no-unused-vars
+  114:10   warning  'transmogTypeFilter' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  114:30   warning  'setTransmogTypeFilter' is assigned a value but never used                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  115:10   warning  'transmogLevelFilter' is assigned a value but never used                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  115:31   warning  'setTransmogLevelFilter' is assigned a value but never used                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+  116:10   warning  'professionFilter' is assigned a value but never used                                                                                                                                                                                                                                    @typescript-eslint/no-unused-vars
+  116:28   warning  'setProfessionFilter' is assigned a value but never used                                                                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  117:10   warning  'mountFactionFilter' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  117:30   warning  'setMountFactionFilter' is assigned a value but never used                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  118:10   warning  'tier9FactionFilter' is assigned a value but never used                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  118:30   warning  'setTier9FactionFilter' is assigned a value but never used                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  156:21   error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                 @typescript-eslint/no-explicit-any
+  184:14   warning  'e' is defined but never used                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  277:9    warning  'handleCryptomusCheckout' is assigned a value but never used                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  386:17   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  788:15   warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\azerothcore\pagina\src\app\forum\[id]\page.tsx
+   72:10  warning  'AvatarColumn' is defined but never used  @typescript-eslint/no-unused-vars
+  160:17  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  206:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  224:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  241:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  271:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  290:19  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\miikiisgm\admin\DarDpAdminForm.tsx
+  40:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\miikiisgm\admin\QrBoliviaAdminForm.tsx
+  23:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\page.tsx
+  113:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\app\payments\qr-bolivia\page.tsx
+  25:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+D:\azerothcore\pagina\src\components\ClientHeader.tsx
+  9:5  error  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\azerothcore\pagina\src\components\ClientHeader.tsx:9:5
+   7 |   const [mounted, setMounted] = useState(false);
+   8 |   useEffect(() => {
+>  9 |     setMounted(true);
+     |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  10 |   }, []);
+  11 |   if (!mounted) {
+  12 |     // Evita renderizar en SSR y durante la hidratación  react-hooks/set-state-in-effect
+
+D:\azerothcore\pagina\src\components\Footer.tsx
+  3:34  warning  'Map' is defined but never used       @typescript-eslint/no-unused-vars
+  3:39  warning  'FileText' is defined but never used  @typescript-eslint/no-unused-vars
+
+D:\azerothcore\pagina\src\components\Header.tsx
+   7:10  warning  'LogOut' is defined but never used                 @typescript-eslint/no-unused-vars
+  89:9   warning  'handleLogout' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\azerothcore\pagina\src\components\StatCards.tsx
+  32:6  warning  React Hook useEffect has a missing dependency: 'displayValue'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+D:\azerothcore\pagina\src\lib\email.ts
+  86:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\lib\soap.ts
+  52:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\azerothcore\pagina\src\lib\srp6.ts
+  54:11  warning  'copyLength' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+D:\azerothcore\pagina\test-soap.js
+  1:1  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\test-srp6.js
+  2:16  error  A `require()` style import is forbidden  @typescript-eslint/no-require-imports
+
+D:\azerothcore\pagina\update-password.js
+   6:1   error    A `require()` style import is forbidden          @typescript-eslint/no-require-imports
+   7:15  error    A `require()` style import is forbidden          @typescript-eslint/no-require-imports
+   8:16  error    A `require()` style import is forbidden          @typescript-eslint/no-require-imports
+  38:9   warning  'copyLength' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 195 problems (151 errors, 44 warnings)
+  1 error and 1 warning potentially fixable with the `--fix` option.
+

@@ -1,0 +1,67 @@
+﻿
+> pagina@0.1.0 build
+> next build
+
+Ôû▓ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+Ô£ô Compiled successfully in 4.7s
+  Skipping validation of types
+  Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/39) ...
+  Generating static pages using 11 workers (9/39) 
+  Generating static pages using 11 workers (19/39) 
+  Generating static pages using 11 workers (29/39) 
+Ô£ô Generating static pages using 11 workers (39/39) in 2.1s
+  Finalizing page optimization ...
+
+Route (app)                          Revalidate  Expire
+Ôöî Ôùï /
+Ôö£ Ôùï /_not-found
+Ôö£ Ôùï /addons
+Ôö£ ãÆ /api/account/password
+Ôö£ ãÆ /api/account/points
+Ôö£ ãÆ /api/account/purchases
+Ôö£ ãÆ /api/addons
+Ôö£ ãÆ /api/admin/give-dp
+Ôö£ ãÆ /api/admin/search-account
+Ôö£ ãÆ /api/admin/shop
+Ôö£ ãÆ /api/armory/[guid]
+Ôö£ ãÆ /api/armory/search
+Ôö£ ãÆ /api/avatar
+Ôö£ ãÆ /api/characters
+Ôö£ ãÆ /api/characters/search
+Ôö£ ãÆ /api/forum/topics
+Ôö£ ãÆ /api/forum/topics/[id]
+Ôö£ ãÆ /api/forum/topics/[id]/comments
+Ôö£ ãÆ /api/login
+Ôö£ ãÆ /api/news
+Ôö£ ãÆ /api/payments/cryptomus/invoice
+Ôö£ ãÆ /api/payments/qr-bolivia
+Ôö£ ãÆ /api/payments/stripe/checkout
+Ôö£ ãÆ /api/payments/stripe/webhook
+Ôö£ ãÆ /api/register
+Ôö£ ãÆ /api/shop/items
+Ôö£ ãÆ /api/shop/purchase
+Ôö£ ãÆ /api/stats/global
+Ôö£ Ôùï /armory
+Ôö£ Ôùï /bizzcms-example                         1m      1y
+Ôö£ Ôùï /cancel
+Ôö£ Ôùï /dashboard
+Ôö£ Ôùï /dashboard/avatar
+Ôö£ ãÆ /dashboard/character/[guid]
+Ôö£ Ôùï /disclaimer
+Ôö£ Ôùï /donate
+Ôö£ Ôùï /forum
+Ôö£ ãÆ /forum/[id]
+Ôö£ Ôùï /miikiisgm/admin
+Ôö£ Ôùï /news
+Ôö£ Ôùï /payments/qr-bolivia
+Ôö£ Ôùï /staff
+Ôöö Ôùï /success
+
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+

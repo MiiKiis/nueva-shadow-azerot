@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 export default function Footer() {
   const socialLinks = [
-    { name: 'Discord', icon: MessageSquare, href: '/forum', color: 'text-[#5865F2]' },
+    { name: 'Discord', icon: MessageSquare, href: 'https://discord.gg/FfPcExmrZW', color: 'text-[#5865F2]' },
     { name: 'YouTube', icon: Youtube, href: '/news', color: 'text-red-600' },
   ];
 

@@ -86,16 +86,16 @@ export async function GET(request: Request) {
            t.completed,
            t.views,
            t.created_at,
-           a.username   AS author_username,
-           a.id         AS author_id,
-           MAX(aa.gmlevel) AS gmlevel,
+           COALESCE(a.username, '[Deleted]') AS author_username,
+           t.author_id                       AS author_id,
+           MAX(aa.gmlevel)                   AS gmlevel,
            (SELECT COUNT(*) FROM forum_comments fc WHERE fc.topic_id = t.id) AS comment_count,
            (SELECT fc2.created_at FROM forum_comments fc2 WHERE fc2.topic_id = t.id ORDER BY fc2.created_at DESC LIMIT 1) AS last_reply_at
          FROM forum_topics t
-         JOIN account a          ON t.author_id = a.id
-         LEFT JOIN account_access aa ON a.id = aa.id
+         LEFT JOIN account a          ON t.author_id = a.id
+         LEFT JOIN account_access aa  ON a.id = aa.id
          ${category ? 'WHERE t.category = ?' : ''}
-         GROUP BY t.id, a.username, a.id
+         GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.completed, t.views, t.created_at, t.author_id, a.username
          ORDER BY t.pinned DESC, t.updated_at DESC`,
         category ? [category] : []
       );
@@ -111,16 +111,16 @@ export async function GET(request: Request) {
          0 AS completed,
          t.views,
          t.created_at,
-         a.username   AS author_username,
-         a.id         AS author_id,
-         MAX(aa.gmlevel) AS gmlevel,
+         COALESCE(a.username, '[Deleted]') AS author_username,
+         t.author_id                       AS author_id,
+         MAX(aa.gmlevel)                   AS gmlevel,
          (SELECT COUNT(*) FROM forum_comments fc WHERE fc.topic_id = t.id) AS comment_count,
          (SELECT fc2.created_at FROM forum_comments fc2 WHERE fc2.topic_id = t.id ORDER BY fc2.created_at DESC LIMIT 1) AS last_reply_at
        FROM forum_topics t
-       JOIN account a          ON t.author_id = a.id
-       LEFT JOIN account_access aa ON a.id = aa.id
+       LEFT JOIN account a          ON t.author_id = a.id
+       LEFT JOIN account_access aa  ON a.id = aa.id
        ${category ? 'WHERE t.category = ?' : ''}
-       GROUP BY t.id, a.username, a.id
+       GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.views, t.created_at, t.author_id, a.username
        ORDER BY t.pinned DESC, t.updated_at DESC`,
       category ? [category] : []
     );

@@ -160,6 +160,23 @@ export default function DonatePage() {
     }
   };
 
+  const SKILL_WOWHEAD_MAP: Record<number, number> = {
+    171: 51304, // Alquimia
+    164: 51300, // Herrería
+    333: 51313, // Encantamiento
+    202: 51306, // Ingeniería
+    182: 50300, // Herboristería
+    773: 51311, // Inscripción
+    755: 51311, // Jewelcrafting
+    165: 51302, // Peletería
+    186: 50310, // Minería
+    393: 50305, // Desuello
+    197: 51309, // Sastrería
+    356: 51294, // Pesca
+    185: 51296, // Cocina
+    129: 45542, // Primeros Auxilios
+  };
+
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (!storedUser) {
@@ -667,17 +684,35 @@ export default function DonatePage() {
                       <div
                         key={item.id}
                         style={{ borderColor }}
+                        onMouseLeave={(e) => {
+                          const link = e.currentTarget.querySelector('a[data-wowhead]');
+                          if (link) {
+                            link.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+                          }
+                        }}
                         className="relative flex flex-col items-center bg-[#060a13]/90 rounded-2xl border-2 p-4 hover:scale-105 transition-all duration-200 group cursor-default"
                       >
                         <div className="flex-1 w-full space-y-4">
-                          <div className="flex gap-4 group/item">
-                            <a 
-                              href={item.item_id && item.item_id > 0 ? `https://www.wowhead.com/wotlk/item=${item.item_id}` : '#'}
-                              data-wowhead={item.item_id && item.item_id > 0 ? `item=${item.item_id}&domain=wotlk` : ''}
-                              target="_blank"
-                              rel="noopener"
-                              className="relative w-20 h-20 flex-shrink-0"
-                            >
+                          <a 
+                            href={
+                              item.service_type === 'profession' 
+                                ? `https://www.wowhead.com/spell=${SKILL_WOWHEAD_MAP[Number(item.item_id)] || item.item_id}`
+                                : item.service_type === 'level_boost' || item.service_type === 'gold_pack'
+                                ? '#'
+                                : `https://www.wowhead.com/item=${item.item_id}`
+                            }
+                            data-wowhead={
+                              item.service_type === 'level_boost' || item.service_type === 'gold_pack'
+                                ? 'disabled'
+                                : item.service_type === 'profession'
+                                ? `spell=${SKILL_WOWHEAD_MAP[Number(item.item_id)] || item.item_id}&domain=wotlk`
+                                : `item=${item.item_id}&domain=wotlk`
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex gap-4 group/item cursor-pointer"
+                          >
+                            <div className="relative w-20 h-20 flex-shrink-0">
                               <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/10 to-transparent group-hover/item:opacity-0 transition-opacity" />
                               {(() => {
                                 const rawIcon = (item.image || 'inv_misc_questionmark').trim().toLowerCase();
@@ -705,7 +740,7 @@ export default function DonatePage() {
                                   />
                                 );
                               })()}
-                            </a>
+                            </div>
 
                             <div className="flex-1 flex flex-col justify-center min-w-0">
                               <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
@@ -715,15 +750,9 @@ export default function DonatePage() {
                               }`}>
                                 {item.quality || 'COMÚN'}
                               </span>
-                              <a
-                                href={item.item_id && item.item_id > 0 ? `https://www.wowhead.com/wotlk/item=${item.item_id}` : '#'}
-                                data-wowhead={item.item_id && item.item_id > 0 ? `item=${item.item_id}&domain=wotlk` : ''}
-                                target="_blank"
-                                rel="noopener"
-                                className="text-white font-black text-lg leading-tight block group-hover/item:text-cyan-300 transition-colors"
-                              >
+                              <h3 className="text-xl font-black text-white group-hover/item:text-purple-400 transition-colors block leading-tight">
                                 {item.name}
-                              </a>
+                              </h3>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-yellow-400 font-black text-base">{item.price}</span>
                                 <span className="text-yellow-400/60 font-bold text-xs uppercase tracking-tighter">
@@ -731,7 +760,7 @@ export default function DonatePage() {
                                 </span>
                               </div>
                             </div>
-                          </div>
+                          </a>
 
                           <p className="text-[11px] text-gray-400 leading-relaxed italic opacity-70">
                             Previsualización rápida del ítem. Haz click en el icono para abrir la ficha completa.

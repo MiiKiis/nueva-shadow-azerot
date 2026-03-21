@@ -63,13 +63,13 @@ export async function GET(
       const [withCompleted]: any = await authPool.query(
         `SELECT
            t.id, t.title, t.category, t.pinned, t.locked, t.completed, t.views, t.created_at,
-           a.id AS author_id, a.username AS author_username,
+           t.author_id, COALESCE(a.username, '[Deleted]') AS author_username,
            MAX(aa.gmlevel) AS gmlevel
          FROM forum_topics t
-         JOIN account a ON t.author_id = a.id
+         LEFT JOIN account a ON t.author_id = a.id
          LEFT JOIN account_access aa ON a.id = aa.id
          WHERE t.id = ?
-         GROUP BY t.id, a.id, a.username`,
+         GROUP BY t.id, t.author_id, a.username`,
         [id]
       );
       rows = withCompleted;
@@ -77,13 +77,13 @@ export async function GET(
       const [withoutCompleted]: any = await authPool.query(
         `SELECT
            t.id, t.title, t.category, t.pinned, t.locked, 0 AS completed, t.views, t.created_at,
-           a.id AS author_id, a.username AS author_username,
+           t.author_id, COALESCE(a.username, '[Deleted]') AS author_username,
            MAX(aa.gmlevel) AS gmlevel
          FROM forum_topics t
-         JOIN account a ON t.author_id = a.id
+         LEFT JOIN account a ON t.author_id = a.id
          LEFT JOIN account_access aa ON a.id = aa.id
          WHERE t.id = ?
-         GROUP BY t.id, a.id, a.username`,
+         GROUP BY t.id, t.author_id, a.username`,
         [id]
       );
       rows = withoutCompleted;
