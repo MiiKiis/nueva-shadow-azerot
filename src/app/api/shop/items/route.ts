@@ -16,6 +16,9 @@ type ShopItemRow = {
   soap_item_count?: number | null;
   service_type: string | null;
   service_data: string | null;
+  faction?: string | null;
+  item_level?: number | null;
+  description?: string | null;
 };
 
 export async function GET() {
@@ -24,7 +27,7 @@ export async function GET() {
       `SELECT id, item_id, image, name, price, currency, quality,
               category, tier, class_mask,
               soap_item_entry, soap_item_count,
-              service_type, service_data
+              service_type, service_data, faction, item_level, description
        FROM shop_items
        ORDER BY category ASC, tier ASC, price ASC, id ASC`
     );
@@ -44,6 +47,9 @@ export async function GET() {
       soap_item_count: item.soap_item_count ?? 1,
       service_type: item.service_type || 'none',
       service_data: item.service_data || null,
+      faction: item.faction || 'all',
+      item_level: item.item_level || 0,
+      description: item.description || '',
     }));
 
     return NextResponse.json({ items }, { status: 200 });

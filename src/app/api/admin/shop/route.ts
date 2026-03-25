@@ -52,8 +52,12 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: adminCheck.error }, { status: adminCheck.status || 403 });
     }
 
+    try {
+      await authPool.query('ALTER TABLE shop_items ADD COLUMN description TEXT NULL DEFAULT NULL');
+    } catch (colErr) { /* ya existe */ }
+
     const [rows]: any = await authPool.query(
-      `SELECT id, name, item_id, price, currency, quality, category, tier, class_mask, image, soap_item_count, service_type, service_data
+      `SELECT id, name, item_id, price, currency, quality, category, tier, class_mask, image, soap_item_count, service_type, service_data, faction, item_level, description
        FROM shop_items
        ORDER BY id DESC`
     );
@@ -99,6 +103,10 @@ export async function POST(request: Request) {
     const service_type = String(body?.serviceType || 'none');
     const service_data = body?.serviceData ? String(body.serviceData) : null;
 
+    const faction = String(body?.faction || 'all').toLowerCase();
+    const itemLevel = Number(body?.itemLevel || 0);
+    const description = body?.description ? String(body.description) : null;
+
     const safeItemId = Math.round(itemId);
     const safePrice = Math.round(price);
     
@@ -111,9 +119,9 @@ export async function POST(request: Request) {
     }
 
     const [result]: any = await authPool.query(
-      `INSERT INTO shop_items (name, item_id, price, currency, image, quality, category, tier, class_mask, soap_item_entry, soap_item_count, service_type, service_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, safeItemId, safePrice, currency, image, quality, category, tier, classMask, safeItemId || null, soapCount, service_type, service_data]
+      `INSERT INTO shop_items (name, item_id, price, currency, image, quality, category, tier, class_mask, soap_item_entry, soap_item_count, service_type, service_data, faction, item_level, description)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, safeItemId, safePrice, currency, image, quality, category, tier, classMask, safeItemId || null, soapCount, service_type, service_data, faction, itemLevel, description]
     );
 
     return NextResponse.json(
@@ -158,16 +166,20 @@ export async function PUT(request: Request) {
     const service_type = String(body?.serviceType || 'none');
     const service_data = body?.serviceData ? String(body.serviceData) : null;
 
+    const faction = String(body?.faction || 'all').toLowerCase();
+    const itemLevel = Number(body?.itemLevel || 0);
+    const description = body?.description ? String(body.description) : null;
+
     const [result]: any = await authPool.query(
       `UPDATE shop_items SET 
         name = ?, item_id = ?, price = ?, currency = ?, image = ?, 
         quality = ?, category = ?, tier = ?, class_mask = ?, 
-        soap_item_entry = ?, soap_item_count = ?, service_type = ?, service_data = ?
+        soap_item_entry = ?, soap_item_count = ?, service_type = ?, service_data = ?, faction = ?, item_level = ?, description = ?
        WHERE id = ? LIMIT 1`,
       [
         name, itemId, price, currency, image, 
         body?.quality || 'comun', category, tier, classMask, 
-        itemId || null, soapCount, service_type, service_data, id
+        itemId || null, soapCount, service_type, service_data, faction, itemLevel, description, id
       ]
     );
 

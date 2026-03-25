@@ -1,0 +1,7 @@
+[
+  {
+    "username": "MIIKIIS",
+    "salt": "f776bcd3a37d2e5b53ff84165f34d6d8ad05257b864fcedd849573c7386e1700",
+    "verifier": "a338536a5ce19e4680def3ab78f6a530a43f4390bf1f7a043964049978a15439"
+  }
+]

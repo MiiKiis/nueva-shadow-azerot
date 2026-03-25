@@ -3,17 +3,23 @@ import { authPool } from '@/lib/db';
 import { calculateVerifier, calculateVerifierLegacy } from '@/lib/srp6';
 
 function toBinaryBuffer(value: unknown): Buffer {
+  if (!value) return Buffer.alloc(32);
   if (Buffer.isBuffer(value)) return value;
   if (value instanceof Uint8Array) return Buffer.from(value);
   if (typeof value === 'string') {
     const trimmed = value.trim();
-    // Some drivers/schemas may return VARBINARY as hex string.
-    if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
+    if (/^[0-9a-fA-F]+$/.test(trimmed) && (trimmed.length === 64 || trimmed.length % 2 === 0)) {
       return Buffer.from(trimmed, 'hex');
     }
     return Buffer.from(trimmed, 'binary');
   }
-  throw new Error('Formato de credenciales SRP6 no soportado en base de datos');
+  // Try to convert to string if it's something else
+  try {
+    const str = String(value);
+    return Buffer.from(str, 'binary');
+  } catch {
+    throw new Error('Formato de credenciales SRP6 no soportado en base de datos');
+  }
 }
 
 export async function POST(request: Request) {
@@ -71,10 +77,11 @@ export async function POST(request: Request) {
     }
 
   } catch (error: any) {
-    console.error('Login Error:', error);
+    console.error('Fatal Login Error:', error);
     return NextResponse.json({ 
-      error: 'Error del servidor',
-      details: error.message 
+      error: 'Error del servidor inesperado',
+      details: error.message,
+      stack: error.stack
     }, { status: 500 });
   }
 }

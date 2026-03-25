@@ -1,0 +1,11 @@
+[
+  {
+    "service_type": "bundle"
+  },
+  {
+    "service_type": "none"
+  },
+  {
+    "service_type": "gold_pack"
+  }
+]

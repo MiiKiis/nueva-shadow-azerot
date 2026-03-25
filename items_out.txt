@@ -1,0 +1,152 @@
+[
+  {
+    "name": "KIT DE LEVEO TELA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":50255,\"count\":1},{\"id\":42985,\"count\":1},{\"id\":48691,\"count\":1},{\"id\":42991,\"count\":1},{\"id\":42947,\"count\":1}]"
+  },
+  {
+    "name": "KIT DE LEVEO MALLA MELE",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":42946,\"count\":1},{\"id\":50255,\"count\":1},{\"id\":42950,\"count\":1},{\"id\":44092,\"count\":1},{\"id\":42991,\"count\":1}]"
+  },
+  {
+    "name": "KIT DE LEVEO CUERO DRUIDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":42991,\"count\":1},{\"id\":50255,\"count\":1},{\"id\":42952,\"count\":1},{\"id\":48718,\"count\":1},{\"id\":48689,\"count\":1}]"
+  },
+  {
+    "name": "KIT DE LEVEO PLACA MELE",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":50255,\"count\":1},{\"id\":42991,\"count\":1},{\"id\":44099,\"count\":1},{\"id\":48685,\"count\":1},{\"id\":42943,\"count\":1}]"
+  },
+  {
+    "name": "KIT  DE LEVEO MALLA CASTER",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":50255,\"count\":1},{\"id\":48683,\"count\":1},{\"id\":42992,\"count\":1},{\"id\":44102,\"count\":1},{\"id\":42947,\"count\":1}]"
+  },
+  {
+    "name": "Riendas del lord Cuervo",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Gallo mágico",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Riendas del tigre espectral presto",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Tortuga de montar",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Cenizas de Al'ar",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Riendas del draco negro",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Cohete de paseo X-53",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "SET TANK 232 DK HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48560,\"count\":1},{\"id\":48562,\"count\":1},{\"id\":48558,\"count\":1},{\"id\":48559,\"count\":1},{\"id\":48561,\"count\":1},{\"id\":47852,\"count\":1},{\"id\":47885,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 DPS HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48503,\"count\":1},{\"id\":48505,\"count\":1},{\"id\":48501,\"count\":1},{\"id\":48502,\"count\":1},{\"id\":48504,\"count\":1},{\"id\":47859,\"count\":1},{\"id\":47869,\"count\":1}]"
+  },
+  {
+    "name": "SET HEAL 232 PALADIN HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48597,\"count\":1},{\"id\":48595,\"count\":1},{\"id\":48599,\"count\":1},{\"id\":48598,\"count\":1},{\"id\":48596,\"count\":1},{\"id\":47858,\"count\":1},{\"id\":47895,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 BRUJO ALIANZA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":47784,\"count\":1},{\"id\":47787,\"count\":1},{\"id\":47786,\"count\":1},{\"id\":47783,\"count\":1},{\"id\":47785,\"count\":1},{\"id\":47612,\"count\":1},{\"id\":47837,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 MAGO ALIANZA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":47748,\"count\":1},{\"id\":47751,\"count\":1},{\"id\":47749,\"count\":1},{\"id\":47752,\"count\":1},{\"id\":47750,\"count\":1},{\"id\":47612,\"count\":1},{\"id\":47837,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 PICARO HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48245,\"count\":1},{\"id\":48247,\"count\":1},{\"id\":48243,\"count\":1},{\"id\":48244,\"count\":1},{\"id\":48246,\"count\":1},{\"id\":47853,\"count\":1},{\"id\":47868,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 BRUJO HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":47801,\"count\":1},{\"id\":47798,\"count\":1},{\"id\":47799,\"count\":1},{\"id\":47802,\"count\":1},{\"id\":47800,\"count\":1},{\"id\":47856,\"count\":1},{\"id\":47855,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 SACERDOTE HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48068,\"count\":1},{\"id\":48071,\"count\":1},{\"id\":48070,\"count\":1},{\"id\":48067,\"count\":1},{\"id\":48069,\"count\":1},{\"id\":47909,\"count\":1},{\"id\":47856,\"count\":1}]"
+  },
+  {
+    "name": "SET TANK 232 PALADIN HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48654,\"count\":1},{\"id\":48656,\"count\":1},{\"id\":48652,\"count\":1},{\"id\":48653,\"count\":1},{\"id\":48655,\"count\":1},{\"id\":47852,\"count\":1},{\"id\":47910,\"count\":1}]"
+  },
+  {
+    "name": "SET DPS 232 PALADIN HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48629,\"count\":1},{\"id\":48627,\"count\":1},{\"id\":48631,\"count\":1},{\"id\":48630,\"count\":1},{\"id\":48628,\"count\":1},{\"id\":47859,\"count\":1},{\"id\":47868,\"count\":1}]"
+  },
+  {
+    "name": "SET HEAL 232 CHAMAN HORDA",
+    "service_type": "bundle",
+    "service_data": "[{\"id\":48297,\"count\":1},{\"id\":48299,\"count\":1},{\"id\":48295,\"count\":1},{\"id\":48296,\"count\":1},{\"id\":48298,\"count\":1},{\"id\":47866,\"count\":1},{\"id\":47895,\"count\":1}]"
+  },
+  {
+    "name": "Bolsa de tejido abisal imbuido x5",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Runa Abisal",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Estandarte de victoria",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Lágrimas del vencido",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "El Corazón Negro",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Posavasos de cromo de Coren",
+    "service_type": "none",
+    "service_data": null
+  },
+  {
+    "name": "Pack oro prueba no usar",
+    "service_type": "gold_pack",
+    "service_data": "5000"
+  }
+]

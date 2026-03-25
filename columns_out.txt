@@ -1,0 +1,18 @@
+[
+  "id",
+  "item_id",
+  "name",
+  "image",
+  "price",
+  "currency",
+  "quality",
+  "category",
+  "tier",
+  "class_mask",
+  "soap_item_entry",
+  "soap_item_count",
+  "service_type",
+  "service_data",
+  "active",
+  "created_at"
+]

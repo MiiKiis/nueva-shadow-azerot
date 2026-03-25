@@ -1,6 +1,6 @@
 'use client';
 
-import { Sparkles, CreditCard, Gift, TrendingUp, X, Shield, ShoppingCart, CheckCircle2, AlertTriangle, Search, Users, Heart, Zap } from 'lucide-react';
+import { Sparkles, CreditCard, Gift, TrendingUp, X, Shield, ShoppingCart, CheckCircle2, AlertTriangle, Search, Users, Heart, Zap, Package } from 'lucide-react';
 import ShopFilters from '@/components/ShopFilters';
 import dynamic from 'next/dynamic';
 // Importa KitItemList de forma dinámica para evitar problemas SSR
@@ -9,8 +9,8 @@ const KitItemList = dynamic(() => import('@/components/KitItemList'), { ssr: fal
 function Modal({ open, onClose, children }: { open: boolean, onClose: () => void, children: React.ReactNode }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-      <div className="bg-[#18192a] rounded-2xl shadow-2xl p-6 max-w-lg w-full relative border-2 border-purple-700">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div className="bg-[#0b0c16]/95 rounded-3xl shadow-[0_0_40px_rgba(168,85,247,0.3)] p-8 max-w-3xl w-full relative border border-purple-600/50 max-h-[90vh] overflow-y-auto">
         <button onClick={onClose} className="absolute top-3 right-3 text-purple-300 hover:text-white bg-black/30 rounded-full p-2"><X className="w-5 h-5" /></button>
         {children}
       </div>
@@ -90,6 +90,15 @@ const WOW_CLASSES = [
   { mask: 1024, name: 'Druida',                abbr: 'DRU', color: '#FF7D0A' },
 ];
 
+const GS_RANGES = [
+  { id: '200-213', name: '200-213 (Naxx/OS)', min: 177, max: 213 },
+  { id: '214-225', name: '214-225 (Ulduar)', min: 214, max: 225 },
+  { id: '226-245', name: '226-245 (ToC)', min: 226, max: 245 },
+  { id: '246-251', name: '246-251 (ICC 10)', min: 246, max: 251 },
+  { id: '252-258', name: '252-258 (ICC 25)', min: 252, max: 258 },
+  { id: '259-264', name: '259-264 (Heroico/Lich)', min: 259, max: 264 },
+];
+
 type CharacterOption = {
   guid: number;
   name: string;
@@ -113,6 +122,8 @@ type ShopItem = {
   transmog_level?: number;
   profession?: string;
   faction?: string;
+  item_level?: number;
+  description?: string;
 };
 
 export default function DonatePage() {
@@ -134,6 +145,7 @@ export default function DonatePage() {
   const [professionFilter, setProfessionFilter] = useState<string>('all');
   const [mountFactionFilter, setMountFactionFilter] = useState<'all' | 'horda' | 'alianza'>('all');
   const [tier9FactionFilter, setTier9FactionFilter] = useState<'all' | 'horda' | 'alianza'>('all');
+  const [shopGsRange, setShopGsRange] = useState<string | null>(null);
   const [selectedCharacterGuid, setSelectedCharacterGuid] = useState<string>('');
   const [deliveryMode, setDeliveryMode] = useState<'self' | 'gift'>('self');
   const [giftSearch, setGiftSearch] = useState<string>('');
@@ -359,13 +371,29 @@ export default function DonatePage() {
     if (!shopCategory) return false;
     if (itemCat !== shopCategory) return false;
     if (shopCategory === 'pve') {
-      if (!shopTier) return false;
-      if ((item.tier ?? 0) !== shopTier) return false;
+      if (shopTier && (item.tier ?? 0) !== shopTier) return false;
+      // Faction filter for Tier 9 specifically
+      if (shopTier === 9 && tier9FactionFilter !== 'all') {
+        if (item.faction && item.faction !== tier9FactionFilter) return false;
+      }
       if (shopClassFilter && item.class_mask !== undefined && item.class_mask > 0) {
         if (!(item.class_mask & shopClassFilter)) return false;
       } else if (shopClassFilter) {
         return false;
       }
+    }
+
+    // GS Filter for WotLK
+    if (shopCategory === 'wotlk' && shopGsRange) {
+      const gsRange = GS_RANGES.find(r => r.id === shopGsRange);
+      if (gsRange) {
+        const itemIlvl = item.item_level || 0;
+        if (itemIlvl < gsRange.min || itemIlvl > gsRange.max) return false;
+      }
+    }
+    // Professional and other filters could go here too if needed
+    if (shopCategory === 'profesiones' && professionFilter !== 'all') {
+      if (item.profession !== professionFilter) return false;
     }
     return true;
   });
@@ -611,10 +639,12 @@ export default function DonatePage() {
 
               {/* Filtros en cascada dependientes */}
               <div className="mb-6">
-                <ShopFilters onFilter={({ category, tier, classId }) => {
+                <ShopFilters onFilter={({ category, tier, classId, faction, gsRange }) => {
                   setShopCategory(category);
                   setShopTier(tier);
                   setShopClassFilter(classId);
+                  setTier9FactionFilter(faction);
+                  setShopGsRange(gsRange);
                 }} />
               </div>
 
@@ -629,7 +659,7 @@ export default function DonatePage() {
                   <p>No hay items en esta categoría / filtro.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredShopItems.map(item => {
                     const qualityColors: Record<string, string> = {
                       common: '#9d9d9d', uncommon: '#1eff00', rare: '#0070dd', epic: '#a335ee', legendary: '#ff8000',
@@ -642,16 +672,17 @@ export default function DonatePage() {
                         key={item.id}
                         style={{ borderColor }}
                         onMouseLeave={handleMouseLeave}
-                        className="relative flex flex-col items-center bg-[#060a13]/90 rounded-2xl border-2 p-4 hover:scale-105 transition-all duration-200 group cursor-default"
+                        className="relative flex flex-col items-center bg-[#060a13]/90 rounded-2xl border-2 p-4 transition-colors duration-200 group cursor-default"
                       >
-                        <div className="flex-1 w-full space-y-4">
+                        <div className="flex-1 w-full space-y-4 relative">
+                          {/* Anchor invisible exclusivo para Wowhead */}
                           <a 
                             href={
                               item.service_type === 'profession' 
                                 ? `https://www.wowhead.com/spell=${SKILL_WOWHEAD_MAP[Number(item.item_id)] || item.item_id}`
                                 : item.service_type === 'level_boost' || item.service_type === 'gold_pack'
                                 ? '#'
-                                : `https://www.wowhead.com/item=${item.item_id}`
+                                : `https://www.wowhead.com/item=${item.item_id}&domain=wotlk`
                             }
                             data-wowhead={
                               item.service_type === 'level_boost' || item.service_type === 'gold_pack'
@@ -662,10 +693,17 @@ export default function DonatePage() {
                             }
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex gap-4 group/item cursor-pointer"
+                            className="absolute inset-0 z-10 block"
+                            style={{ fontSize: 0, color: 'transparent' }}
+                            data-wh-rename="false"
                           >
-                            <div className="relative w-20 h-20 flex-shrink-0">
-                              <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/10 to-transparent group-hover/item:opacity-0 transition-opacity" />
+                            &nbsp;
+                          </a>
+
+                          {/* Estructura visual protegida de inyección DOM */}
+                          <div className="flex items-start gap-4 flex-col sm:flex-row group/item pointer-events-none relative z-0">
+                            <div className="relative w-20 h-20 sm:w-24 sm:h-24 flex-shrink-0 mx-auto sm:mx-0">
+                              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent group-hover/item:opacity-0 transition-opacity" />
                               {(() => {
                                 const rawIcon = (item.image || 'inv_misc_questionmark').trim().toLowerCase();
                                 const iconName = rawIcon || 'inv_misc_questionmark';
@@ -676,12 +714,12 @@ export default function DonatePage() {
                                       : `https://wow.zamimg.com/images/wow/icons/large/${iconName}.jpg`
                                     );
                                 
-                                return (
+                               return (
                                   <Image
                                     src={imageSrc}
                                     alt={item.name}
                                     fill
-                                    className="rounded-xl object-cover border border-white/10 shadow-lg"
+                                    className="rounded-2xl object-cover border border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.5)]"
                                     onError={(e) => {
                                       const target = e.target as HTMLImageElement;
                                       if (target.src !== '/items/default.png') {
@@ -694,7 +732,7 @@ export default function DonatePage() {
                               })()}
                             </div>
 
-                            <div className="flex-1 flex flex-col justify-center min-w-0">
+                            <div className="flex-1 flex flex-col justify-center min-w-0 text-center sm:text-left mt-2 sm:mt-0">
                               <span className={`text-[10px] font-black uppercase tracking-widest mb-1 ${
                                 item.quality === 'leyenda' ? 'text-orange-400' : 
                                 item.quality === 'epico' ? 'text-purple-400' : 
@@ -702,31 +740,43 @@ export default function DonatePage() {
                               }`}>
                                 {item.quality || 'COMÚN'}
                               </span>
-                              <h3 className="text-xl font-black text-white group-hover/item:text-purple-400 transition-colors block leading-tight">
+                              <h3 className="text-lg sm:text-xl font-black text-white group-hover/item:text-purple-400 transition-colors block leading-tight">
                                 {item.name}
                               </h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-yellow-400 font-black text-base">{item.price}</span>
-                                <span className="text-yellow-400/60 font-bold text-xs uppercase tracking-tighter">
-                                  Créditos
+                              {item.item_level && item.item_level > 0 && (
+                                <div className="mt-1.5 mb-1">
+                                  <span className="text-[10px] bg-purple-900/60 text-purple-200 px-2 py-0.5 rounded border border-purple-700/40 font-black">
+                                    {item.item_level} Item Level / GS
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
+                                <span className="text-yellow-400 font-black text-xl">{item.price}</span>
+                                <span className="text-yellow-400/60 font-bold text-sm uppercase tracking-tighter">
+                                  {item.currency === 'dp' ? 'DP' : 'VP'}
                                 </span>
                               </div>
                             </div>
-                          </a>
+                          </div>
 
-                          <p className="text-[11px] text-gray-400 leading-relaxed italic opacity-70">
-                            {isKit
-                              ? 'Este kit contiene varios objetos. Haz click en "Ver contenido" para ver la lista completa.'
-                              : 'Previsualización rápida del ítem. Haz click en el icono para abrir la ficha completa.'}
-                          </p>
-                                                    {isKit && (
-                                                      <button
-                                                        className="mt-2 px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs shadow-lg border border-purple-900/40"
-                                                        onClick={() => { setActiveKitId(item.id); setOpenKitModal(true); }}
-                                                      >
-                                                        Ver contenido
-                                                      </button>
-                                                    )}
+                          <div className="bg-black/20 p-3 rounded-xl mt-2 relative z-20">
+                            <p className="text-xs text-center text-gray-400 leading-relaxed opacity-90">
+                              {item.description 
+                                ? item.description 
+                                : isKit
+                                  ? 'Set Rápido: Este paquete incluye múltiples piezas de equipo para tu personaje.'
+                                  : 'Compra Rápida: Recibirás 1 unidad de este artículo instantáneamente por correo en el juego.'}
+                            </p>
+                            
+                            {isKit && (
+                              <button
+                                className="w-full mt-3 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-indigo-900/40 hover:bg-indigo-700/60 text-indigo-300 hover:text-white font-bold text-xs border border-indigo-500/30 transition-all"
+                                onClick={() => { setActiveKitId(item.id); setOpenKitModal(true); }}
+                              >
+                                <Package className="w-4 h-4" /> Inspeccionar Set o Contenido Completo
+                              </button>
+                            )}
+                          </div>
                           
                           {item.class_mask !== undefined && Number(item.class_mask) > 0 && (
                             <div className="flex flex-wrap gap-1">
@@ -755,11 +805,19 @@ export default function DonatePage() {
                           )}
                           {isPurchasing ? 'Procesando…' : 'Comprar ahora'}
                         </button>
-                                        {/* Modal de contenido de kit */}
-                                        <Modal open={openKitModal} onClose={() => setOpenKitModal(false)}>
-                                          <h2 className="text-2xl font-black mb-4 text-purple-300">Contenido del Kit</h2>
-                                          {activeKitId && <KitItemList kitId={activeKitId} />}
-                                        </Modal>
+                    {/* Modal de contenido de kit */}
+                    <Modal open={openKitModal} onClose={() => setOpenKitModal(false)}>
+                      <div className="flex flex-col items-center mb-6">
+                        <Package className="w-12 h-12 text-purple-400 mb-2 drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
+                        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-300 uppercase tracking-widest text-center">
+                          Contenido del Paquete
+                        </h2>
+                        <p className="text-gray-400 text-sm mt-2 text-center">Todos los objetos a continuación se enviarán a tu personaje instantáneamente tras la compra.</p>
+                      </div>
+                      <div className="bg-black/30 rounded-2xl border border-white/5 overflow-hidden">
+                        {activeKitId && <KitItemList kitId={activeKitId} />}
+                      </div>
+                    </Modal>
                       </div>
                     );
                   })}

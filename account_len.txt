@@ -1,0 +1,7 @@
+[
+  {
+    "username": "MIIKIIS",
+    "salt_len": 32,
+    "verifier_len": 32
+  }
+]
