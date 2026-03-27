@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { authPool } from '@/lib/db';
 import { generateSrp6Data } from '@/lib/srp6';
 import crypto from 'crypto';
@@ -46,7 +46,11 @@ function isValidPassword(password: string): boolean {
 }
 
 // ─── Get real client IP (behind proxy / Cloudflare / nginx) ──────────────────
-function getClientIp(request: Request): string {
+function getClientIp(request: NextRequest): string {
+    // 0. Next.js specific ip (if available, mostly on Vercel)
+    const nextIp = request.ip;
+    if (nextIp) return nextIp;
+
     const headers = request.headers;
     // Priority: CF-Connecting-IP > X-Real-IP > X-Forwarded-For > fallback
     const cfIp = headers.get('cf-connecting-ip');
@@ -115,7 +119,7 @@ async function verifyRecaptcha(token: string): Promise<{ success: boolean; score
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
         const { username, password, email, pin, recaptchaToken } = body;
@@ -211,7 +215,7 @@ export async function POST(request: Request) {
             if (clientIp && clientIp !== '0.0.0.0') {
                 const [ipCheckRows]: any = await connection.query(
                     `SELECT COUNT(*) AS cnt FROM account
-                     WHERE reg_ip = ? AND joindate > DATE_SUB(NOW(), INTERVAL 24 HOUR)`,
+                     WHERE last_ip = ? AND DATE(joindate) = CURDATE()`,
                     [clientIp]
                 );
                 const recentRegistrations = Number(ipCheckRows?.[0]?.cnt || 0);
@@ -219,7 +223,7 @@ export async function POST(request: Request) {
                     return NextResponse.json(
                         {
                             success: false,
-                            message: 'Has superado el límite de 3 cuentas por día. Intenta más tarde.'
+                            message: 'Has alcanzado el límite de 3 cuentas por día para tu conexión (IP).'
                         },
                         { status: 429 }
                     );
