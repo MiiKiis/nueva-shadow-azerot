@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { authPool, pool as charPool } from '@/lib/db';
+import { executeSoapCommand } from '@/lib/soap';
 
 // Mapeos básicos para el snapshot
 const RACE_MAP: Record<number, string> = { 1: 'Humano', 2: 'Orco', 3: 'Enano', 4: 'Elfo de la Noche', 5: 'No-Muerto', 6: 'Tauren', 7: 'Gnomo', 8: 'Trol', 10: 'Elfo de Sangre', 11: 'Draenei' };
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
 
     // 1. Verificar propiedad y datos del personaje
     const [charRows]: any = await charPool.query(
-      'SELECT guid, name, race, class, level, gender, money, totalKills, arenaPoints, totalHonorPoints FROM characters WHERE guid = ? AND account = ?',
+      'SELECT guid, name, race, class, level, gender, money, totalKills, arenaPoints, totalHonorPoints, online FROM characters WHERE guid = ? AND account = ?',
       [guid, sellerAccountId]
     );
 
@@ -26,6 +27,18 @@ export async function POST(req: Request) {
     }
 
     const character = charRows[0];
+
+    // 1.2 Seguridad: Si el personaje está online, lo desconectamos
+    if (Number(character.online) === 1) {
+      try {
+        await executeSoapCommand(`.kick ${character.name} "Mercado: Desconexión de seguridad"`);
+      } catch (e) {
+        console.warn('Fallo al intentar kickear vía SOAP:', e);
+      }
+      return NextResponse.json({ 
+        error: 'El personaje ha sido desconectado por seguridad. Por favor, espera 1 minuto a que el servidor actualice su estado y vuelve a intentarlo.' 
+      }, { status: 403 });
+    }
 
     // 1.5 Fetch Equipment y Profesiones
     let equippedItems = [];
