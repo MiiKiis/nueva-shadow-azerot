@@ -69,6 +69,37 @@ async function ensurePurchaseHistoryTable(connection: Awaited<ReturnType<typeof 
 
 // ─── SOAP utilities ──────────────────────────────────────────────────────────
 
+type SoapVariant = {
+  namespace: 'urn:AC' | 'urn:MaNGOS' | 'urn:TC';
+  prefixedMethod: boolean;
+  soapAction: string;
+};
+
+const SOAP_VARIANTS: SoapVariant[] = [
+  { namespace: 'urn:AC', prefixedMethod: true, soapAction: 'executeCommand' },
+  { namespace: 'urn:MaNGOS', prefixedMethod: true, soapAction: 'executeCommand' },
+  { namespace: 'urn:TC', prefixedMethod: true, soapAction: 'executeCommand' },
+  { namespace: 'urn:AC', prefixedMethod: false, soapAction: 'urn:AC#executeCommand' },
+  { namespace: 'urn:MaNGOS', prefixedMethod: false, soapAction: 'urn:MaNGOS#executeCommand' },
+];
+
+function buildSoapEnvelope(command: string, variant: SoapVariant): string {
+  const method = variant.prefixedMethod ? 'ns1:executeCommand' : 'executeCommand';
+  return `<?xml version="1.0" encoding="utf-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="${variant.namespace}">
+  <SOAP-ENV:Body>
+    <${method}>
+      <command>${command}</command>
+    </${method}>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`;
+}
+
+function shouldTryNextVariant(status: number, text: string): boolean {
+  if (status === 401 || status === 403) return false;
+  return /method name or namespace not recognized|not implemented|namespace/i.test(text);
+}
+
 async function executeSoapCommand(command: string) {
   const soapEndpoint = await getSoapUrl();
   const soapUser = process.env.ACORE_SOAP_USER;
@@ -78,67 +109,107 @@ async function executeSoapCommand(command: string) {
     throw new Error('SOAP no está configurado correctamente. Revisa las variables de entorno: ACORE_SOAP_USER, ACORE_SOAP_PASSWORD.');
   }
 
-  const xml = `<?xml version="1.0" encoding="utf-8"?>
-<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:AC">
-  <SOAP-ENV:Body>
-    <ns1:executeCommand>
-      <command>${command}</command>
-    </ns1:executeCommand>
-  </SOAP-ENV:Body>
-</SOAP-ENV:Envelope>`;
+  const escapeXml = (value: string) =>
+    String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
 
-  const auth = Buffer.from(`${soapUser}:${soapPassword}`).toString('base64');
-  let response;
-  let text = '';
+  const escapedCommand = escapeXml(command);
+
+  const authUsers = Array.from(new Set([soapUser, soapUser.toUpperCase()]));
+  const failures: string[] = [];
+  let authErrorObj: any = null;
   try {
-    response = await fetch(soapEndpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Basic ${auth}`,
-        'Content-Type': 'text/xml; charset=utf-8',
-        SOAPAction: 'executeCommand',
-      },
-      body: xml,
-      cache: 'no-store',
-    });
-    text = await response.text();
-  } catch (err) {
+    for (const authUser of authUsers) {
+      const auth = Buffer.from(`${authUser}:${soapPassword}`).toString('base64');
+      for (const variant of SOAP_VARIANTS) {
+        const xml = buildSoapEnvelope(escapedCommand, variant);
+        const response = await fetch(soapEndpoint, {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${auth}`,
+            'Content-Type': 'text/xml; charset=utf-8',
+            SOAPAction: variant.soapAction,
+          },
+          body: xml,
+          cache: 'no-store',
+        });
+        const text = await response.text();
+
+        if (response.ok && !/faultcode|SOAP-ENV:Fault|<result>false<\/result>/i.test(text)) {
+          return { skipped: false };
+        }
+
+        let userMessage = 'Error al comunicarse con el servidor.';
+        const soapFault = text.match(/<faultstring>([\s\S]*?)<\/faultstring>/i)?.[1]?.trim();
+
+        if (response.status === 401 || response.status === 403) {
+          userMessage = 'Permisos insuficientes para ejecutar el comando SOAP.';
+        }
+        if (/incorrect|denied|not allowed|no permission|invalid/i.test(text)) {
+          userMessage = text;
+        }
+        if (soapFault) {
+          userMessage = soapFault;
+        }
+
+        failures.push(`${authUser}/${variant.namespace}/${variant.prefixedMethod ? 'prefixed' : 'plain'} (${variant.soapAction}) => HTTP ${response.status}${soapFault ? `: ${soapFault}` : ''}`);
+
+        if (response.status === 401 || response.status === 403 || !shouldTryNextVariant(response.status, text)) {
+          const errorObj = {
+            error: userMessage,
+            details: soapFault
+              ? `SOAP devolvio HTTP ${response.status}. Fault: ${soapFault}`
+              : `SOAP devolvio HTTP ${response.status}.${text ? ` Respuesta: ${String(text).slice(0, 240)}` : ''}`,
+            code: response.status === 401 || response.status === 403 ? 'SOAP_FORBIDDEN' : 'SOAP_HTTP_ERROR',
+            statusCode: response.status === 401 || response.status === 403 ? 502 : 503,
+            soapCommand: command,
+            soapResponse: text,
+            httpStatus: response.status,
+            variantsTried: failures,
+          };
+          if (response.status === 401 || response.status === 403) {
+            authErrorObj = errorObj;
+            break;
+          }
+          throw Object.assign(new Error(userMessage), errorObj);
+        }
+      }
+    }
+
+    if (authErrorObj) {
+      throw Object.assign(new Error(authErrorObj.error), authErrorObj);
+    }
+
     const errorObj = {
-      error: 'No se pudo conectar al servidor SOAP.',
+      error: 'El servidor SOAP rechazo todas las variantes de namespace/metodo.',
+      details: failures.join(' | '),
+      code: 'SOAP_NAMESPACE_MISMATCH',
+      statusCode: 503,
       soapCommand: command,
       soapResponse: null,
+      variantsTried: failures,
+    };
+    throw Object.assign(new Error(errorObj.error), errorObj);
+  } catch (err: any) {
+    if (err?.code || err?.statusCode) {
+      throw err;
+    }
+    const cause = String(err?.message || 'fetch failed');
+    const errorObj = {
+      error: 'No se pudo conectar al servidor SOAP.',
+      details: `Endpoint: ${soapEndpoint}. Causa: ${cause}`,
+      code: 'SOAP_UNREACHABLE',
+      statusCode: 503,
+      soapCommand: command,
+      soapResponse: null,
+      variantsTried: failures,
     };
     throw Object.assign(new Error(errorObj.error), errorObj);
   }
-
-  if (!response.ok) {
-    let userMessage = 'Error al comunicarse con el servidor.';
-    if (response.status === 401 || response.status === 403) {
-      userMessage = 'Permisos insuficientes para ejecutar el comando SOAP.';
-    }
-    if (/incorrect|denied|not allowed|no permission|invalid/i.test(text)) {
-      userMessage = text;
-    }
-    const errorObj = {
-      error: userMessage,
-      soapCommand: command,
-      soapResponse: text,
-      httpStatus: response.status,
-    };
-    throw Object.assign(new Error(userMessage), errorObj);
-  }
-
-  if (/faultcode|SOAP-ENV:Fault|<result>false<\/result>/i.test(text)) {
-    const match = text.match(/<faultstring>(.*?)<\/faultstring>/i);
-    const faultMsg = match ? match[1] : 'Comando SOAP falló.';
-    throw Object.assign(new Error(faultMsg), {
-      error: faultMsg,
-      soapCommand: command,
-      soapResponse: text,
-    });
-  }
-
-  return { skipped: false };
 }
 
 // ─── Mail-based item delivery via SOAP (AzerothCore compatible) ─────────────
@@ -661,14 +732,25 @@ export async function POST(request: Request) {
       isGift
     });
 
+    const statusCode = Number(error?.statusCode) || (error?.code === 'SOAP_UNREACHABLE' ? 503 : 500);
+    const safeError = error?.error || (statusCode === 503 ? 'Servicio de entrega temporalmente no disponible' : 'Error interno en el servidor');
+    const safeDetails = error?.details || error?.message || 'Error no especificado';
+    const hint = error?.code === 'SOAP_UNREACHABLE'
+      ? 'No hay conexion con SOAP. Verifica tunel SSH, URL y que el servicio SOAP del core este activo.'
+      : error?.code === 'SOAP_FORBIDDEN'
+        ? 'SOAP respondio sin permisos. Revisa ACORE_SOAP_USER, ACORE_SOAP_PASSWORD y privilegios SOAP.'
+        : error?.code === 'SOAP_HTTP_ERROR' || error?.code === 'SOAP_FAULT'
+          ? 'SOAP respondio con error. Revisa logs del worldserver/authserver y el comando enviado.'
+          : 'Verifica que el personaje esté desconectado si es un servicio de login.';
+
     return NextResponse.json(
       {
-        error: 'Error interno en el servidor',
-        details: error.message,
-        code: error.code || 'INTERNAL_ERROR',
-        hint: 'Verifica que el personaje esté desconectado si es un servicio de login.'
+        error: safeError,
+        details: safeDetails,
+        code: error?.code || 'INTERNAL_ERROR',
+        hint
       },
-      { status: 500 }
+      { status: statusCode }
     );
   } finally {
     if (connection) {

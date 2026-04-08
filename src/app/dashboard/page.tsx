@@ -540,6 +540,7 @@ export default function Dashboard() {
         }
     return (
       <div 
+        suppressHydrationWarning
         className="min-h-screen flex items-center justify-center relative overflow-x-hidden"
         style={{
           backgroundImage: "url('/fono.png')",
@@ -557,6 +558,7 @@ export default function Dashboard() {
 
   return (
     <div 
+      suppressHydrationWarning
       className="min-h-screen text-gray-100 py-28 sm:py-32 px-4 sm:px-6 font-sans relative overflow-x-hidden"
       style={{
         backgroundImage: "url('/fono.png')",

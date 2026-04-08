@@ -33,8 +33,8 @@ function CatManagerPanel({
     nodes: { id: number; slug: string; name: string; description?: string; image?: string; parent_id?: number | null }[],
     depth = 0,
     visited = new Set<number>()
-  ): JSX.Element[] => {
-    const options: JSX.Element[] = [];
+  ): React.ReactElement[] => {
+    const options: React.ReactElement[] = [];
     for (const node of nodes) {
       if (visited.has(node.id)) continue;
       visited.add(node.id);
@@ -50,7 +50,7 @@ function CatManagerPanel({
     node: { id: number; slug: string; name: string; description?: string; image?: string; parent_id?: number | null },
     depth = 0,
     visited = new Set<number>()
-  ): JSX.Element | null => {
+  ): React.ReactElement | null => {
     if (visited.has(node.id)) return null;
     visited.add(node.id);
     const children = getChildren(node.id);
@@ -339,13 +339,17 @@ export default function DonatePage() {
   const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null);
   const [targetAccountId, setTargetAccountId] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
   const customAmountRef = useRef<string>('');
+  const wowheadDispatchLock = useRef(false);
   // Mutex síncrono: evita que múltiples clicks disparen varias compras antes de que React re-renderice
   const purchaseLock = useRef(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [openKitModal, setOpenKitModal] = useState(false);
   const [activeKitId, setActiveKitId] = useState<number | null>(null);
   const [isPayPalLoaded, setIsPayPalLoaded] = useState(false);
+  const [paypalLoadError, setPaypalLoadError] = useState<string>('');
+  const paypalButtonsRef = useRef<any>(null);
   const [paymentResult, setPaymentResult] = useState<{ success: boolean; message: string; transactionId?: string; points?: number } | null>(null);
   const [raffles, setRaffles] = useState<RaffleItem[]>([]);
   const [raffleLoading, setRaffleLoading] = useState(false);
@@ -380,11 +384,27 @@ export default function DonatePage() {
   }, [customAmount]);
 
   useEffect(() => {
-    if (showCheckout && selectedDonation && isPayPalLoaded && (window as any).paypal) {
-      const container = document.getElementById('paypal-button-container');
-      if (container) {
-        container.innerHTML = '';
-        (window as any).paypal.Buttons({
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!showCheckout || !selectedDonation || !isPayPalLoaded || !(window as any).paypal) return;
+
+    const container = document.getElementById('paypal-button-container');
+    if (!container) return;
+
+    if (paypalButtonsRef.current && typeof paypalButtonsRef.current.close === 'function') {
+      try {
+        paypalButtonsRef.current.close();
+      } catch {
+        // Ignore close errors from stale instances.
+      }
+      paypalButtonsRef.current = null;
+    }
+
+    container.innerHTML = '';
+
+    const buttons = (window as any).paypal.Buttons({
           style: { layout: 'vertical', color: 'gold', shape: 'rect', label: 'pay' },
           createOrder: (data: any, actions: any) => {
             const currentCustom = customAmountRef.current;
@@ -428,24 +448,79 @@ export default function DonatePage() {
                 message: err.message || 'Error de comunicación con el servidor'
               });
             }
+          },
+          onError: (err: any) => {
+            setPaymentResult({
+              success: false,
+              message: err?.message || 'Error inesperado de PayPal'
+            });
           }
-        }).render('#paypal-button-container');
+        });
+
+    paypalButtonsRef.current = buttons;
+    buttons.render(container).catch((err: any) => {
+      setPaymentResult({
+        success: false,
+        message: err?.message || 'No se pudo inicializar PayPal'
+      });
+    });
+
+    return () => {
+      if (paypalButtonsRef.current && typeof paypalButtonsRef.current.close === 'function') {
+        try {
+          paypalButtonsRef.current.close();
+        } catch {
+          // Ignore close errors on unmount/updates.
+        }
       }
+      paypalButtonsRef.current = null;
+      container.innerHTML = '';
+    };
+  }, [showCheckout, selectedDonation?.amount, selectedDonation?.points, isPayPalLoaded, user?.username, isCustomMode]);
+
+  useEffect(() => {
+    if (!showCheckout) {
+      setPaypalLoadError('');
+      return;
     }
-  }, [showCheckout, selectedDonation, isPayPalLoaded, user?.username, isCustomMode]);
+
+    if (isPayPalLoaded || (window as any).paypal) return;
+
+    const timer = window.setTimeout(() => {
+      if (!(window as any).paypal) {
+        setPaypalLoadError('No se pudo cargar PayPal. Revisa bloqueadores del navegador o usa un método alternativo.');
+      }
+    }, 7000);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [showCheckout, isPayPalLoaded]);
 
   const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (wowheadDispatchLock.current) return;
     const link = e.currentTarget.querySelector('a[data-wowhead]');
     if (link) {
-      link.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+      wowheadDispatchLock.current = true;
+      try {
+        link.dispatchEvent(new MouseEvent('mouseout', { bubbles: false }));
+      } finally {
+        wowheadDispatchLock.current = false;
+      }
     }
   };
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (wowheadDispatchLock.current) return;
     const link = e.currentTarget.querySelector('a[data-wowhead]');
     if (link) {
-      link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-      link.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+      wowheadDispatchLock.current = true;
+      try {
+        link.dispatchEvent(new MouseEvent('mouseover', { bubbles: false }));
+        link.dispatchEvent(new MouseEvent('mousemove', { bubbles: false }));
+      } finally {
+        wowheadDispatchLock.current = false;
+      }
     }
   };
 
@@ -648,7 +723,12 @@ export default function DonatePage() {
         }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Error en la compra');
+      if (!response.ok) {
+        const detailText = Array.from(
+          new Set([data?.error, data?.details, data?.hint].map((v) => String(v || '').trim()).filter(Boolean))
+        ).join(' | ');
+        throw new Error(detailText || 'Error en la compra');
+      }
       setPurchaseMessage(data.message || 'Compra realizada con éxito');
       if (isGift) setGiftPin('');
       
@@ -823,9 +903,13 @@ export default function DonatePage() {
     </motion.button>
   );
 
+  if (!mounted) {
+    return null;
+  }
+
   if (checkingAuth) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-black text-white">
+      <main suppressHydrationWarning className="min-h-screen flex items-center justify-center bg-black text-white">
         <div className="flex flex-col items-center gap-4">
           <div className="w-16 h-16 border-4 border-purple-900 border-t-purple-600 rounded-full animate-spin shadow-[0_0_20px_rgba(168,85,247,0.3)]" />
           <p className="text-purple-300 font-bold uppercase tracking-widest text-xs animate-pulse">Cargando Tienda...</p>
@@ -836,6 +920,7 @@ export default function DonatePage() {
 
   return (
     <main 
+      suppressHydrationWarning
       className="min-h-screen pt-32 pb-20 text-white font-sans relative overflow-x-hidden"
       style={{ backgroundImage: "url('/fono.png')", backgroundSize: 'cover', backgroundAttachment: 'fixed', backgroundPosition: 'center' }}
     >
@@ -843,7 +928,20 @@ export default function DonatePage() {
         {`window.$WowheadPower = { colorlinks: true, iconizelinks: false, renamelinks: true, locale: 'es' };`}
       </Script>
       <Script src="https://wow.zamimg.com/widgets/power.js" strategy="afterInteractive" />
-      {PAYPAL_CLIENT_ID && <Script src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`} onLoad={() => setIsPayPalLoaded(true)} strategy="lazyOnload" />}
+      {PAYPAL_CLIENT_ID && (
+        <Script
+          src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`}
+          onLoad={() => {
+            setIsPayPalLoaded(true);
+            setPaypalLoadError('');
+          }}
+          onError={() => {
+            setIsPayPalLoaded(false);
+            setPaypalLoadError('El SDK de PayPal fue bloqueado por el navegador o una extensión.');
+          }}
+          strategy="lazyOnload"
+        />
+      )}
       
       <div className="absolute inset-0 bg-[#070b16]/60 backdrop-blur-[2px] z-0" />
 
@@ -1638,9 +1736,14 @@ export default function DonatePage() {
             <div className="relative group">
               {/* Contenedor PayPal con Estilo */}
               <div id="paypal-button-container" className="w-full min-h-[150px] relative z-10" />
-              {!isPayPalLoaded && (
+              {!isPayPalLoaded && !paypalLoadError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-2xl border border-white/5">
                    <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {paypalLoadError && (
+                <div className="mt-4 rounded-2xl border border-rose-500/40 bg-rose-900/20 px-4 py-3 text-center text-rose-200 text-xs font-bold uppercase tracking-wider">
+                  {paypalLoadError}
                 </div>
               )}
             </div>

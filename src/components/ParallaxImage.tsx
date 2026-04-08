@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import SimpleParallax from 'simple-parallax-js';
 
 interface ParallaxImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   scale?: number;
@@ -12,7 +11,7 @@ interface ParallaxImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 }
 
 /**
- * A wrapper for SimpleParallax from simple-parallax-js.
+ * Minimal image wrapper that keeps the previous component API stable.
  */
 export default function ParallaxImage({ 
   scale = 1.2, 
@@ -24,25 +23,23 @@ export default function ParallaxImage({
   style,
   ...props 
 }: ParallaxImageProps) {
+  void scale;
+  void delay;
+  void orientation;
+  void transition;
+  void overflow;
+
   return (
-    <SimpleParallax
-      scale={scale}
-      delay={delay}
-      orientation={orientation}
-      transition={transition}
-      overflow={overflow}
-    >
-      <img 
-        className={className}
-        style={{ 
-          display: 'block',
-          width: '100%',
-          height: '100%',
-          objectFit: 'cover',
-          ...style 
-        }}
-        {...props} 
-      />
-    </SimpleParallax>
+    <img 
+      className={className}
+      style={{ 
+        display: 'block',
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        ...style 
+      }}
+      {...props} 
+    />
   );
 }

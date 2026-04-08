@@ -11,13 +11,13 @@
   }
 
   html {
-    scroll-behavior: smooth;
     overflow-x: hidden;
     max-width: 100vw;
   }
 
   body {
     @apply text-gray-300 font-sans overflow-x-hidden;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
     max-width: 100vw;
     background-image: url('/fono.png');
     background-size: cover;

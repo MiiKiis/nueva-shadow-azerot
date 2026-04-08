@@ -3,8 +3,17 @@
 import { MessageSquare, Youtube, Map, FileText, Zap } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 export default function Footer() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
   const socialLinks = [
     { name: 'Facebook', icon: '/facebook.png', href: '#', color: 'hover:border-[#1877F2]/50 hover:bg-[#1877F2]/5' },
     { name: 'TikTok', icon: '/tiktok.png', href: '#', color: 'hover:border-white/30 hover:bg-white/5' },
@@ -22,7 +31,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer className="relative bg-[#050505] border-t border-[#d4af37]/10 pt-14 sm:pt-20 pb-10 z-10 px-4 sm:px-6 mt-16 sm:mt-20">
+    <footer suppressHydrationWarning className="relative bg-[#050505] border-t border-[#d4af37]/10 pt-14 sm:pt-20 pb-10 z-10 px-4 sm:px-6 mt-16 sm:mt-20">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent opacity-50" />
       <div className="relative">
@@ -39,6 +48,7 @@ export default function Footer() {
                     src="/shadow-azeroth.png"
                     alt="Shadow Azeroth"
                     fill
+                    sizes="48px"
                     className="object-cover rounded-full"
                   />
                 </div>
