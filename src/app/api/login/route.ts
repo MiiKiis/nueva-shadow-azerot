@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authPool } from '@/lib/db';
 import { calculateVerifier, calculateVerifierLegacy } from '@/lib/srp6';
+import { awardLevelRewardsForAccount } from '@/lib/estelasLevelRewards';
 import { RowDataPacket } from 'mysql2';
 
 function toBinaryBuffer(value: unknown): Buffer {
@@ -67,6 +68,11 @@ export async function POST(request: Request) {
 
       // 3. Compare verifiers
       if (calculatedVerifier.equals(storedVerifier) || legacyCalculatedVerifier.equals(storedVerifier)) {
+        // Best effort: grant pending milestone estelas on login.
+        awardLevelRewardsForAccount(Number(account.id)).catch((err) => {
+          console.error('Estelas login award error:', err);
+        });
+
         // SUCCESS
         return NextResponse.json({ 
           success: true,

@@ -289,6 +289,20 @@ type RaffleItem = {
   };
 };
 
+type AdminPurchaseItem = {
+  id: number;
+  account_id: number;
+  account_username: string | null;
+  item_id: number;
+  item_name: string;
+  currency: 'vp' | 'dp';
+  price: number;
+  character_guid: number | null;
+  character_name: string;
+  is_gift: number;
+  created_at: string;
+};
+
 async function readApiData(res: Response): Promise<any> {
   const raw = await res.text();
   if (!raw) return {};
@@ -307,6 +321,8 @@ async function readApiData(res: Response): Promise<any> {
 }
 
 export default function DonatePage() {
+  const PURCHASE_UI_COOLDOWN_MS = 2200;
+  const ADMIN_PURCHASES_PAGE_SIZE = 20;
   const router = useRouter();
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedDonation, setSelectedDonation] = useState<(typeof DONATIONS)[number] | null>(null);
@@ -335,7 +351,8 @@ export default function DonatePage() {
   const [purchaseMessage, setPurchaseMessage] = useState<string>('');
   const [purchaseError, setPurchaseError] = useState<string>('');
   const [purchasingItemId, setPurchasingItemId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'rewards' | 'donations' | 'raffles'>('rewards');
+  const [isPurchaseLocked, setIsPurchaseLocked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'rewards' | 'donations' | 'raffles' | 'admin'>('rewards');
   const [subCategoryFilter, setSubCategoryFilter] = useState<string | null>(null);
   const [targetAccountId, setTargetAccountId] = useState<string>('');
   const [customAmount, setCustomAmount] = useState<string>('');
@@ -344,6 +361,7 @@ export default function DonatePage() {
   const wowheadDispatchLock = useRef(false);
   // Mutex síncrono: evita que múltiples clicks disparen varias compras antes de que React re-renderice
   const purchaseLock = useRef(false);
+  const purchaseCooldownTimer = useRef<number | null>(null);
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [openKitModal, setOpenKitModal] = useState(false);
   const [activeKitId, setActiveKitId] = useState<number | null>(null);
@@ -369,6 +387,18 @@ export default function DonatePage() {
     status: 'draft' as 'draft' | 'active' | 'closed',
   });
   const [savingRaffleAdmin, setSavingRaffleAdmin] = useState(false);
+  const [adminPurchases, setAdminPurchases] = useState<AdminPurchaseItem[]>([]);
+  const [adminPurchasesLoading, setAdminPurchasesLoading] = useState(false);
+  const [adminPurchasesError, setAdminPurchasesError] = useState('');
+  const [adminPurchasesPage, setAdminPurchasesPage] = useState(1);
+  const [adminPurchasesTotalPages, setAdminPurchasesTotalPages] = useState(1);
+  const [adminPurchaseFilters, setAdminPurchaseFilters] = useState({
+    accountId: '',
+    accountName: '',
+    characterName: '',
+    currency: 'all' as 'all' | 'vp' | 'dp',
+    gift: 'all' as 'all' | '1' | '0',
+  });
 
   useEffect(() => {
     fetch('/api/shop/categories')
@@ -484,18 +514,73 @@ export default function DonatePage() {
       return;
     }
 
-    if (isPayPalLoaded || (window as any).paypal) return;
+    if (!PAYPAL_CLIENT_ID) {
+      setIsPayPalLoaded(false);
+      setPaypalLoadError('PayPal no esta configurado en el servidor. Falta NEXT_PUBLIC_PAYPAL_CLIENT_ID.');
+      return;
+    }
+
+    if ((window as any).paypal) {
+      setIsPayPalLoaded(true);
+      setPaypalLoadError('');
+      return;
+    }
+
+    const scriptId = 'paypal-sdk-script';
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    let isCancelled = false;
+
+    const onLoad = () => {
+      if (isCancelled) return;
+      if ((window as any).paypal) {
+        setIsPayPalLoaded(true);
+        setPaypalLoadError('');
+      } else {
+        setIsPayPalLoaded(false);
+        setPaypalLoadError('PayPal se cargo, pero no inicializo correctamente.');
+      }
+    };
+
+    const onError = () => {
+      if (isCancelled) return;
+      setIsPayPalLoaded(false);
+      setPaypalLoadError('El SDK de PayPal fue bloqueado por el navegador o una extension.');
+    };
+
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(PAYPAL_CLIENT_ID)}&currency=USD&intent=capture`;
+      script.async = true;
+      script.addEventListener('load', onLoad);
+      script.addEventListener('error', onError);
+      document.body.appendChild(script);
+    } else {
+      script.addEventListener('load', onLoad);
+      script.addEventListener('error', onError);
+    }
 
     const timer = window.setTimeout(() => {
       if (!(window as any).paypal) {
         setPaypalLoadError('No se pudo cargar PayPal. Revisa bloqueadores del navegador o usa un método alternativo.');
       }
-    }, 7000);
+    }, 8000);
 
     return () => {
+      isCancelled = true;
+      script?.removeEventListener('load', onLoad);
+      script?.removeEventListener('error', onError);
       window.clearTimeout(timer);
     };
-  }, [showCheckout, isPayPalLoaded]);
+  }, [showCheckout]);
+
+  useEffect(() => {
+    return () => {
+      if (purchaseCooldownTimer.current !== null) {
+        window.clearTimeout(purchaseCooldownTimer.current);
+      }
+    };
+  }, []);
 
   const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
     if (wowheadDispatchLock.current) return;
@@ -697,16 +782,104 @@ export default function DonatePage() {
     }
   };
 
+  const loadAdminPurchases = async (page: number = 1) => {
+    if (!user || gmLevel < 3) return;
+
+    setAdminPurchasesLoading(true);
+    setAdminPurchasesError('');
+    try {
+      const params = new URLSearchParams({
+        userId: String(user.id),
+        page: String(page),
+        limit: String(ADMIN_PURCHASES_PAGE_SIZE),
+      });
+
+      if (adminPurchaseFilters.accountId.trim()) params.set('accountId', adminPurchaseFilters.accountId.trim());
+      if (adminPurchaseFilters.accountName.trim()) params.set('accountName', adminPurchaseFilters.accountName.trim());
+      if (adminPurchaseFilters.characterName.trim()) params.set('characterName', adminPurchaseFilters.characterName.trim());
+      if (adminPurchaseFilters.currency !== 'all') params.set('currency', adminPurchaseFilters.currency);
+      if (adminPurchaseFilters.gift !== 'all') params.set('isGift', adminPurchaseFilters.gift);
+
+      const res = await fetch(`/api/admin/purchases?${params.toString()}`, { cache: 'no-store' });
+      const data = await readApiData(res);
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar historial global de compras');
+
+      setAdminPurchases(Array.isArray(data.purchases) ? data.purchases : []);
+      setAdminPurchasesPage(Number(data?.pagination?.page || page));
+      setAdminPurchasesTotalPages(Math.max(1, Number(data?.pagination?.totalPages || 1)));
+    } catch (err: any) {
+      setAdminPurchasesError(err?.message || 'Error cargando historial global de compras');
+    } finally {
+      setAdminPurchasesLoading(false);
+    }
+  };
+
+  const handleAdminPurchaseSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await loadAdminPurchases(1);
+  };
+
+  const clearAdminPurchaseFilters = async () => {
+    setAdminPurchaseFilters({
+      accountId: '',
+      accountName: '',
+      characterName: '',
+      currency: 'all',
+      gift: 'all',
+    });
+    setAdminPurchasesPage(1);
+    if (!user || gmLevel < 3) return;
+    const params = new URLSearchParams({
+      userId: String(user.id),
+      page: '1',
+      limit: String(ADMIN_PURCHASES_PAGE_SIZE),
+    });
+    setAdminPurchasesLoading(true);
+    setAdminPurchasesError('');
+    try {
+      const res = await fetch(`/api/admin/purchases?${params.toString()}`, { cache: 'no-store' });
+      const data = await readApiData(res);
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar historial global de compras');
+      setAdminPurchases(Array.isArray(data.purchases) ? data.purchases : []);
+      setAdminPurchasesPage(Number(data?.pagination?.page || 1));
+      setAdminPurchasesTotalPages(Math.max(1, Number(data?.pagination?.totalPages || 1)));
+    } catch (err: any) {
+      setAdminPurchasesError(err?.message || 'Error cargando historial global de compras');
+    } finally {
+      setAdminPurchasesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if ((activeTab === 'raffles' || activeTab === 'admin') && user && gmLevel >= 3) {
+      loadAdminPurchases(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, user?.id, gmLevel]);
+
   const handlePurchase = async (itemId: number, currency: 'vp' | 'dp') => {
     // Guard síncrono: si ya hay una compra en vuelo, ignorar todos los clicks adicionales
-    if (purchaseLock.current) return;
+    if (purchaseLock.current || isPurchaseLocked) return;
     purchaseLock.current = true;
+    setIsPurchaseLocked(true);
 
-    if (!user) { setPurchaseError('Debes iniciar sesión para comprar.'); purchaseLock.current = false; return; }
+    const unlockWithCooldown = (ms: number = PURCHASE_UI_COOLDOWN_MS) => {
+      if (purchaseCooldownTimer.current !== null) {
+        window.clearTimeout(purchaseCooldownTimer.current);
+      }
+      purchaseCooldownTimer.current = window.setTimeout(() => {
+        setPurchasingItemId(null);
+        setIsPurchaseLocked(false);
+        purchaseLock.current = false;
+        purchaseCooldownTimer.current = null;
+      }, ms);
+    };
+
+    if (!user) { setPurchaseError('Debes iniciar sesión para comprar.'); setIsPurchaseLocked(false); purchaseLock.current = false; return; }
     const isGift = deliveryMode === 'gift';
     const targetGuid = isGift ? giftCharacter?.guid : Number(selectedCharacterGuid);
-    if (!targetGuid) { setPurchaseError(isGift ? 'Busca y selecciona un personaje destino.' : 'Selecciona un personaje.'); purchaseLock.current = false; return; }
-    if (isGift && !/^\d{4}$/.test(giftPin.trim())) { setPurchaseError('PIN de 4 dígitos requerido.'); purchaseLock.current = false; return; }
+    if (!targetGuid) { setPurchaseError(isGift ? 'Busca y selecciona un personaje destino.' : 'Selecciona un personaje.'); setIsPurchaseLocked(false); purchaseLock.current = false; return; }
+    if (isGift && !/^\d{4}$/.test(giftPin.trim())) { setPurchaseError('PIN de 4 dígitos requerido.'); setIsPurchaseLocked(false); purchaseLock.current = false; return; }
 
     setPurchasingItemId(itemId);
     setPurchaseMessage('');
@@ -739,8 +912,7 @@ export default function DonatePage() {
     } catch (error: any) {
       setPurchaseError(error.message);
     } finally {
-      setPurchasingItemId(null);
-      purchaseLock.current = false; // Liberar el lock para permitir nuevas compras
+      unlockWithCooldown();
     }
   };
 
@@ -928,21 +1100,7 @@ export default function DonatePage() {
         {`window.$WowheadPower = { colorlinks: true, iconizelinks: false, renamelinks: true, locale: 'es' };`}
       </Script>
       <Script src="https://wow.zamimg.com/widgets/power.js" strategy="afterInteractive" />
-      {PAYPAL_CLIENT_ID && (
-        <Script
-          src={`https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`}
-          onLoad={() => {
-            setIsPayPalLoaded(true);
-            setPaypalLoadError('');
-          }}
-          onError={() => {
-            setIsPayPalLoaded(false);
-            setPaypalLoadError('El SDK de PayPal fue bloqueado por el navegador o una extensión.');
-          }}
-          strategy="lazyOnload"
-        />
-      )}
-      
+
       <div className="absolute inset-0 bg-[#070b16]/60 backdrop-blur-[2px] z-0" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 relative z-10">
@@ -962,14 +1120,15 @@ export default function DonatePage() {
           {[
             { id: 'donations', label: 'Cargar Créditos', icon: CreditCard, color: 'purple' },
             { id: 'rewards', label: 'Tienda de Objetos', icon: ShoppingCart, color: 'cyan' },
-            { id: 'raffles', label: 'Sorteos', icon: Gift, color: 'pink' }
+            { id: 'raffles', label: 'Sorteos', icon: Gift, color: 'pink' },
+            ...(gmLevel >= 3 ? [{ id: 'admin', label: 'Panel Admin', icon: Shield, color: 'amber' }] : []),
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 sm:gap-3 px-4 sm:px-8 lg:px-10 py-3 sm:py-4 lg:py-5 rounded-2xl sm:rounded-3xl font-black uppercase tracking-wider text-[11px] sm:text-sm transition-all duration-300 ${
                 activeTab === tab.id 
-                  ? `bg-gradient-to-r ${tab.color === 'purple' ? 'from-purple-600 to-indigo-600 shadow-[0_0_25px_rgba(168,85,247,0.4)]' : tab.color === 'cyan' ? 'from-cyan-600 to-blue-600 shadow-[0_0_25px_rgba(6,182,212,0.4)]' : 'from-pink-600 to-rose-600 shadow-[0_0_25px_rgba(236,72,153,0.4)]'} text-white` 
+                  ? `bg-gradient-to-r ${tab.color === 'purple' ? 'from-purple-600 to-indigo-600 shadow-[0_0_25px_rgba(168,85,247,0.4)]' : tab.color === 'cyan' ? 'from-cyan-600 to-blue-600 shadow-[0_0_25px_rgba(6,182,212,0.4)]' : tab.color === 'pink' ? 'from-pink-600 to-rose-600 shadow-[0_0_25px_rgba(236,72,153,0.4)]' : 'from-amber-600 to-orange-600 shadow-[0_0_25px_rgba(245,158,11,0.45)]'} text-white` 
                   : 'bg-black/40 border border-white/5 text-gray-500 hover:text-white hover:bg-white/5'
               }`}
             >
@@ -1376,8 +1535,149 @@ export default function DonatePage() {
                       </div>
                     ))}
                   </div>
+
+                  <div className="pt-4 border-t border-amber-500/20">
+                    <button
+                      onClick={() => setActiveTab('admin')}
+                      className="w-full md:w-auto px-4 py-3 rounded-xl border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 text-xs font-black uppercase tracking-widest"
+                    >
+                      Ver Historial Global de Compras en Panel Admin
+                    </button>
+                  </div>
                 </div>
               )}
+            </motion.section>
+          )}
+
+          {activeTab === 'admin' && gmLevel >= 3 && (
+            <motion.section
+              key="admin"
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -16 }}
+              className="mb-12 space-y-6"
+            >
+              <div className="rounded-[2rem] border border-cyan-500/35 bg-gradient-to-br from-[#061420]/90 via-[#0a1627]/85 to-[#0b1222]/85 p-6 space-y-4">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h3 className="text-xl font-black uppercase tracking-widest text-cyan-300">Historial Global de Compras</h3>
+                  <button
+                    onClick={() => loadAdminPurchases(adminPurchasesPage)}
+                    className="px-3 py-2 rounded-lg border border-cyan-500/40 text-xs font-black text-cyan-300 hover:bg-cyan-500/10"
+                  >
+                    Actualizar
+                  </button>
+                </div>
+
+                <form onSubmit={handleAdminPurchaseSearch} className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                  <input
+                    value={adminPurchaseFilters.accountId}
+                    onChange={(e) => setAdminPurchaseFilters((p) => ({ ...p, accountId: e.target.value.replace(/[^0-9]/g, '') }))}
+                    placeholder="ID cuenta"
+                    className="bg-black/60 border border-cyan-500/30 rounded-xl px-3 py-2 text-white text-xs"
+                  />
+                  <input
+                    value={adminPurchaseFilters.accountName}
+                    onChange={(e) => setAdminPurchaseFilters((p) => ({ ...p, accountName: e.target.value }))}
+                    placeholder="Usuario"
+                    className="bg-black/60 border border-cyan-500/30 rounded-xl px-3 py-2 text-white text-xs"
+                  />
+                  <input
+                    value={adminPurchaseFilters.characterName}
+                    onChange={(e) => setAdminPurchaseFilters((p) => ({ ...p, characterName: e.target.value }))}
+                    placeholder="Personaje"
+                    className="bg-black/60 border border-cyan-500/30 rounded-xl px-3 py-2 text-white text-xs"
+                  />
+                  <select
+                    value={adminPurchaseFilters.currency}
+                    onChange={(e) => setAdminPurchaseFilters((p) => ({ ...p, currency: e.target.value as 'all' | 'vp' | 'dp' }))}
+                    className="bg-black/60 border border-cyan-500/30 rounded-xl px-3 py-2 text-white text-xs"
+                  >
+                    <option value="all">Moneda: Todas</option>
+                    <option value="dp">DP</option>
+                    <option value="vp">Estelas</option>
+                  </select>
+                  <select
+                    value={adminPurchaseFilters.gift}
+                    onChange={(e) => setAdminPurchaseFilters((p) => ({ ...p, gift: e.target.value as 'all' | '1' | '0' }))}
+                    className="bg-black/60 border border-cyan-500/30 rounded-xl px-3 py-2 text-white text-xs"
+                  >
+                    <option value="all">Tipo: Todos</option>
+                    <option value="1">Regalos</option>
+                    <option value="0">Compras propias</option>
+                  </select>
+                  <div className="flex gap-2">
+                    <button type="submit" className="flex-1 px-3 py-2 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white text-xs font-black uppercase tracking-widest">
+                      Buscar
+                    </button>
+                    <button type="button" onClick={clearAdminPurchaseFilters} className="flex-1 px-3 py-2 rounded-lg border border-white/20 text-gray-200 text-xs font-black uppercase tracking-widest">
+                      Limpiar
+                    </button>
+                  </div>
+                </form>
+
+                {adminPurchasesError && (
+                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-rose-300 text-xs font-bold">
+                    {adminPurchasesError}
+                  </div>
+                )}
+
+                <div className="overflow-x-auto rounded-xl border border-white/10 bg-black/40">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-white/5 text-gray-300 uppercase tracking-widest">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Fecha</th>
+                        <th className="px-3 py-2 text-left">Cuenta</th>
+                        <th className="px-3 py-2 text-left">Item</th>
+                        <th className="px-3 py-2 text-left">Moneda</th>
+                        <th className="px-3 py-2 text-left">Precio</th>
+                        <th className="px-3 py-2 text-left">Personaje</th>
+                        <th className="px-3 py-2 text-left">Tipo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adminPurchasesLoading ? (
+                        <tr>
+                          <td className="px-3 py-6 text-center text-gray-400" colSpan={7}>Cargando historial...</td>
+                        </tr>
+                      ) : adminPurchases.length === 0 ? (
+                        <tr>
+                          <td className="px-3 py-6 text-center text-gray-400" colSpan={7}>Sin registros con esos filtros.</td>
+                        </tr>
+                      ) : (
+                        adminPurchases.map((p) => (
+                          <tr key={p.id} className="border-t border-white/5">
+                            <td className="px-3 py-2 text-gray-200 whitespace-nowrap">{new Date(p.created_at).toLocaleString()}</td>
+                            <td className="px-3 py-2 text-gray-200">#{p.account_id} {p.account_username ? `(${p.account_username})` : ''}</td>
+                            <td className="px-3 py-2 text-white font-semibold">{p.item_name}</td>
+                            <td className="px-3 py-2 text-gray-200 uppercase">{p.currency}</td>
+                            <td className="px-3 py-2 text-gray-200">{p.price}</td>
+                            <td className="px-3 py-2 text-gray-200">{p.character_name || '-'}</td>
+                            <td className="px-3 py-2 text-gray-200">{Number(p.is_gift) === 1 ? 'Regalo' : 'Propia'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    disabled={adminPurchasesPage <= 1 || adminPurchasesLoading}
+                    onClick={() => loadAdminPurchases(Math.max(1, adminPurchasesPage - 1))}
+                    className="px-3 py-2 rounded-lg border border-white/20 text-xs font-black text-gray-200 disabled:opacity-40"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-xs text-gray-300 font-bold uppercase tracking-widest">Página {adminPurchasesPage} / {adminPurchasesTotalPages}</span>
+                  <button
+                    disabled={adminPurchasesPage >= adminPurchasesTotalPages || adminPurchasesLoading}
+                    onClick={() => loadAdminPurchases(Math.min(adminPurchasesTotalPages, adminPurchasesPage + 1))}
+                    className="px-3 py-2 rounded-lg border border-white/20 text-xs font-black text-gray-200 disabled:opacity-40"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              </div>
             </motion.section>
           )}
 
@@ -1643,31 +1943,31 @@ export default function DonatePage() {
                                         {(item.price_dp > 0 || (item.price > 0 && item.currency === 'dp')) && (
                                           <button
                                             onClick={() => handlePurchase(item.id, 'dp')}
-                                            disabled={purchasingItemId !== null}
+                                            disabled={isPurchaseLocked || purchasingItemId !== null}
                                             className={`flex-1 border rounded-xl py-3.5 font-black text-[10px] uppercase tracking-widest transition-all ${
                                               purchasingItemId === item.id
                                                 ? 'bg-yellow-900/40 border-yellow-700/30 text-yellow-500 cursor-not-allowed animate-pulse'
-                                                : purchasingItemId !== null
+                                                : (isPurchaseLocked || purchasingItemId !== null)
                                                 ? 'bg-yellow-600/5 border-yellow-700/20 text-yellow-800 cursor-not-allowed'
                                                 : ('bg-gradient-to-r from-yellow-500/25 to-amber-500/20 hover:from-yellow-500 hover:to-amber-500 text-yellow-200 hover:text-black border-yellow-400/50 shadow-[0_0_20px_rgba(234,179,8,0.15)] active:scale-95' + (deliveryMode === 'gift' ? ' ring-2 ring-yellow-500/60 scale-[1.02]' : ''))
                                             }`}
                                           >
-                                            {purchasingItemId === item.id ? '⏳ Procesando...' : deliveryMode === 'gift' ? '🎁 Regalar con DP' : 'Canjear DP'}
+                                            {purchasingItemId === item.id ? '⏳ Procesando...' : deliveryMode === 'gift' ? '🎁 Regalar con DP' : 'Donaciones'}
                                           </button>
                                         )}
                                         {deliveryMode !== 'gift' && (item.price_vp > 0 || (item.currency === 'vp' && item.price > 0)) && (
                                           <button
                                             onClick={() => handlePurchase(item.id, 'vp')}
-                                            disabled={purchasingItemId !== null}
+                                            disabled={isPurchaseLocked || purchasingItemId !== null}
                                             className={`flex-1 border rounded-xl py-3.5 font-black text-[10px] uppercase tracking-widest transition-all ${
                                               purchasingItemId === item.id
                                                 ? 'bg-violet-900/40 border-violet-700/30 text-violet-500 cursor-not-allowed animate-pulse'
-                                                : purchasingItemId !== null
+                                                : (isPurchaseLocked || purchasingItemId !== null)
                                                 ? 'bg-violet-600/5 border-violet-700/20 text-violet-800 cursor-not-allowed'
                                                 : 'bg-gradient-to-r from-violet-500/25 to-fuchsia-500/20 hover:from-violet-500 hover:to-fuchsia-500 text-violet-100 hover:text-white border-violet-400/50 shadow-[0_0_20px_rgba(139,92,246,0.16)] active:scale-95'
                                             }`}
                                           >
-                                            {purchasingItemId === item.id ? '⏳ Procesando...' : 'Canjear VP'}
+                                            {purchasingItemId === item.id ? '⏳ Procesando...' : 'Estelas'}
                                           </button>
                                         )}
                                      </div>
@@ -1762,7 +2062,7 @@ export default function DonatePage() {
                     <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center font-black text-green-500 text-xl uppercase">QR</div>
                     <div className="font-black text-white uppercase text-xs">Pago QR Bolivia</div>
                  </div>
-                 <a href="/qr" target="_blank" className="block text-center py-3 bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white rounded-xl font-black uppercase text-[9px] transition-all border border-green-500/40">Ver Código QR</a>
+                 <a href="/payments/qr-bolivia" target="_blank" rel="noreferrer" className="block text-center py-3 bg-green-500/20 hover:bg-green-500 text-green-400 hover:text-white rounded-xl font-black uppercase text-[9px] transition-all border border-green-500/40">Ver Código QR</a>
                </motion.div>
             </div>
           </div>
