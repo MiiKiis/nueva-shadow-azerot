@@ -3,6 +3,28 @@ import { authPool } from '@/lib/db';
 import { ensureRecruitTables } from '@/lib/recruitAFriend';
 import { sendRecruitInviteEmail } from '@/lib/email';
 
+function resolveAppBaseUrl(request: Request): string {
+  const explicit =
+    process.env.APP_BASE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL;
+
+  if (explicit && String(explicit).trim()) {
+    return String(explicit).trim().replace(/\/$/, '');
+  }
+
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const forwardedProto = request.headers.get('x-forwarded-proto');
+  if (forwardedHost) {
+    const proto = (forwardedProto || 'https').split(',')[0].trim();
+    const host = forwardedHost.split(',')[0].trim();
+    return `${proto}://${host}`;
+  }
+
+  return new URL(request.url).origin;
+}
+
 export async function POST(request: Request) {
   let connection: Awaited<ReturnType<typeof authPool.getConnection>> | null = null;
 
@@ -47,7 +69,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'La invitacion no tiene token valido.' }, { status: 500 });
     }
 
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_BASE_URL || new URL(request.url).origin;
+    const appBaseUrl = resolveAppBaseUrl(request);
     const inviteUrl = `${appBaseUrl}/?ref=${encodeURIComponent(inviteToken)}&rid=${Number(referral.id)}&register=1`;
 
     try {
