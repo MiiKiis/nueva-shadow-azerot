@@ -3,6 +3,7 @@ import { authPool } from '@/lib/db';
 import { generateSrp6Data } from '@/lib/srp6';
 import crypto from 'crypto';
 import { sendPinReminderEmail } from '@/lib/email';
+import { ensureRecruitTables } from '@/lib/recruitAFriend';
 
 // Validation constants
 const MIN_USERNAME_LENGTH = 3;
@@ -195,7 +196,7 @@ async function verifyRecaptcha(token: string): Promise<{ success: boolean; score
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        const { username, password, email, pin, recaptchaToken } = body;
+        const { username, password, email, pin, recaptchaToken, inviteToken } = body;
         const originalEmail = String(email || '').trim();
         const normalizedEmail = normalizeEmail(originalEmail);
 
@@ -275,6 +276,34 @@ export async function POST(request: NextRequest) {
         // 4. Check if user already exists + IP anti-spam
         const connection = await authPool.getConnection();
         try {
+            await ensureRecruitTables(connection);
+
+            const cleanInviteToken = String(inviteToken || '').trim();
+            let inviteRow: any = null;
+            if (cleanInviteToken) {
+                const [inviteRows]: any = await connection.query(
+                    `SELECT id, friend_email, recruited_account_id
+                     FROM recruit_a_friend_referrals
+                     WHERE invite_token = ?
+                     LIMIT 1`,
+                    [cleanInviteToken]
+                );
+
+                if (!inviteRows || inviteRows.length === 0) {
+                    return NextResponse.json({ success: false, message: 'El enlace de reclutamiento no es valido.' }, { status: 400 });
+                }
+
+                inviteRow = inviteRows[0];
+                if (inviteRow.recruited_account_id) {
+                    return NextResponse.json({ success: false, message: 'Este enlace de reclutamiento ya fue usado.' }, { status: 409 });
+                }
+
+                const inviteEmail = normalizeEmail(String(inviteRow.friend_email || ''));
+                if (inviteEmail && inviteEmail !== normalizedEmail) {
+                    return NextResponse.json({ success: false, message: 'Debes registrar la cuenta con el correo del enlace de invitacion.' }, { status: 400 });
+                }
+            }
+
             // ── IP ANTI-SPAM: Max 1 account per IP per 24h ───────
             // Ensure last_ip column exists
             try {
@@ -445,6 +474,18 @@ export async function POST(request: NextRequest) {
                 'INSERT INTO account_security_pin (account_id, pin_salt, pin_hash) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE pin_salt = VALUES(pin_salt), pin_hash = VALUES(pin_hash)',
                 [accountId, pinSalt, pinHash]
             );
+
+            if (inviteRow) {
+                await connection.query(
+                    `UPDATE recruit_a_friend_referrals
+                     SET recruited_account_id = ?,
+                         recruited_username = ?,
+                         accepted_at = NOW(),
+                         status = 'registered'
+                     WHERE id = ?`,
+                    [accountId, String(username).toUpperCase(), Number(inviteRow.id)]
+                );
+            }
 
             try {
                 await sendPinReminderEmail(

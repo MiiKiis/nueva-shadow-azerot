@@ -29,6 +29,7 @@ type CharacterRow = {
   guid: number;
   name: string;
   account?: number;
+  online?: number;
 };
 
 function toBinaryBuffer(value: unknown): Buffer {
@@ -298,7 +299,7 @@ async function sendItemsViaMail(params: {
 // Parse "49908, 50644, 50078:2" into [{entry, count}]
 function parseItemList(raw: string): { entry: number; count: number }[] {
   if (!raw || !raw.trim()) return [];
-  return raw.split(',')
+  return raw.split(/[\n,;]+/)
     .map(s => s.trim())
     .filter(Boolean)
     .map(s => {
@@ -358,6 +359,7 @@ async function deliverProfession(character: CharacterRow, itemId: number, servic
   let skillId = itemId;
   let skillLevel = 450;
   let materialsRaw = '';
+  const PROFESSION_SKILL_CAP = 450;
 
   if (serviceData) {
     try {
@@ -378,13 +380,41 @@ async function deliverProfession(character: CharacterRow, itemId: number, servic
 
   const rankSpellId = professionRanks[skillId];
 
+  const isOnline = Number(character.online || 0) === 1;
+
+  async function trySoapCommands(commands: string[]): Promise<boolean> {
+    for (const command of commands) {
+      try {
+        await executeSoapCommand(command);
+        return true;
+      } catch {
+        // Try next command variant.
+      }
+    }
+    return false;
+  }
+
   if (skillId > 0) {
-    try {
-      if (rankSpellId) await executeSoapCommand(`.learn ${rankSpellId} ${character.name}`);
-      const safeLevel = Math.min(skillLevel, 450);
-      await executeSoapCommand(`.setskill ${character.name} ${skillId} ${safeLevel} ${safeLevel}`);
-    } catch {
-      const safeLevel = Math.min(skillLevel, 450);
+    const safeLevel = Math.max(1, Math.min(skillLevel, PROFESSION_SKILL_CAP));
+
+    const setSkillApplied = await trySoapCommands([
+      `.setskill ${character.name} ${skillId} ${safeLevel} ${safeLevel}`,
+      `.character set skill ${character.name} ${skillId} ${safeLevel} ${safeLevel}`,
+      `.character setskill ${character.name} ${skillId} ${safeLevel} ${safeLevel}`,
+    ]);
+
+    if (setSkillApplied) {
+      if (rankSpellId) {
+        await trySoapCommands([
+          `.learn ${rankSpellId} ${character.name}`,
+          `.character learn ${character.name} ${rankSpellId}`,
+        ]);
+      }
+    } else {
+      if (isOnline) {
+        throw new Error('No se pudo aplicar la profesion porque el personaje esta en linea y SOAP fallo. Intenta con el personaje desconectado.');
+      }
+
       const [existingSkill]: any = await pool.query(
         'SELECT guid FROM character_skills WHERE guid = ? AND skill = ? LIMIT 1',
         [character.guid, skillId]
@@ -394,6 +424,13 @@ async function deliverProfession(character: CharacterRow, itemId: number, servic
       } else {
         await pool.query('INSERT INTO character_skills (guid, skill, value, max) VALUES (?, ?, ?, ?)', [character.guid, skillId, safeLevel, safeLevel]);
       }
+
+      if (rankSpellId) {
+        await pool.query(
+          'INSERT IGNORE INTO character_spell (guid, spell, active, disabled) VALUES (?, ?, 1, 0)',
+          [character.guid, rankSpellId]
+        );
+      }
     }
   }
 
@@ -401,8 +438,8 @@ async function deliverProfession(character: CharacterRow, itemId: number, servic
   if (materials.length > 0) {
     await sendItemsViaMail({
       receiverName: character.name,
-      subject: 'Kit de Profesión',
-      body: 'Aquí tienes los materiales para tu profesión. ¡Revisa tu buzón!',
+      subject: 'Kit de Profesion',
+      body: 'Aqui tienes los materiales para tu profesion. Revisa tu buzon!',
       items: materials,
     });
   }
@@ -577,8 +614,8 @@ export async function POST(request: Request) {
     let character: CharacterRow | null = null;
     if (characterGuid) {
       const sql = isGift
-        ? 'SELECT guid, name, account FROM characters WHERE guid = ? LIMIT 1'
-        : 'SELECT guid, name, account FROM characters WHERE guid = ? AND account = ? LIMIT 1';
+        ? 'SELECT guid, name, account, online FROM characters WHERE guid = ? LIMIT 1'
+        : 'SELECT guid, name, account, online FROM characters WHERE guid = ? AND account = ? LIMIT 1';
       const params = isGift ? [characterGuid] : [characterGuid, userId];
 
       const [characterRows] = await pool.query(sql, params);

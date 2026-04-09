@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -34,6 +34,8 @@ type Topic = {
   pinned: boolean;
   locked: boolean;
   completed: boolean;
+  in_review?: boolean;
+  denied?: boolean;
   views: number;
   created_at: string;
   author: { id: number; username: string };
@@ -43,6 +45,13 @@ type CharacterOption = {
   guid: number;
   name: string;
   level: number;
+};
+
+type ForumSectionOption = {
+  id: string;
+  label: string;
+  parent_id?: string | null;
+  order_index?: number;
 };
 
 function getForumCharacterStorageKey(userId: number): string {
@@ -160,7 +169,12 @@ export default function TopicPage() {
   const [isGM,         setIsGM]         = useState(false);
   const [isStaff,      setIsStaff]      = useState(false);
   const [deletingTopic, setDeletingTopic] = useState(false);
-  const [togglingCompleted, setTogglingCompleted] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [forumSections, setForumSections] = useState<ForumSectionOption[]>([]);
+  const [moveTargetCategory, setMoveTargetCategory] = useState('');
+  const [movingTopic, setMovingTopic] = useState(false);
+  const [movePickerOpen, setMovePickerOpen] = useState(false);
+  const [expandedMainSection, setExpandedMainSection] = useState('');
   const [formatPromptOpen, setFormatPromptOpen] = useState(false);
   const [formatPromptTag, setFormatPromptTag] = useState<'img' | 'color' | 'size' | 'font' | null>(null);
   const [formatPromptTitle, setFormatPromptTitle] = useState('');
@@ -174,6 +188,38 @@ export default function TopicPage() {
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const replyRef  = useRef<HTMLTextAreaElement>(null);
+  const movePickerRef = useRef<HTMLDivElement>(null);
+
+  const sortedSections = useMemo(() => {
+    return [...forumSections].sort((a, b) => {
+      const ao = Number(a.order_index || 0);
+      const bo = Number(b.order_index || 0);
+      if (ao !== bo) return ao - bo;
+      return String(a.label || '').localeCompare(String(b.label || ''));
+    });
+  }, [forumSections]);
+
+  const moveMainSections = useMemo(
+    () => sortedSections.filter((section) => !section.parent_id),
+    [sortedSections]
+  );
+
+  const moveChildrenByParent = useMemo(() => {
+    const map = new Map<string, ForumSectionOption[]>();
+    for (const section of sortedSections) {
+      const parentId = section.parent_id ? String(section.parent_id) : '';
+      if (!parentId) continue;
+      const current = map.get(parentId) || [];
+      current.push(section);
+      map.set(parentId, current);
+    }
+    return map;
+  }, [sortedSections]);
+
+  const currentMoveTargetId = String(moveTargetCategory || topic?.category || '');
+  const currentMoveTargetLabel =
+    sortedSections.find((section) => String(section.id) === currentMoveTargetId)?.label ||
+    (topic?.category || 'Seleccionar');
 
   const insertBBCode = (openTag: string, closeTag: string) => {
     if (!replyRef.current) return;
@@ -282,6 +328,22 @@ export default function TopicPage() {
               setCharacters([]);
               setSelectedCharacterName('');
             });
+
+          fetch(`/api/forum/sections?userId=${parsedUser.id}`)
+            .then((r) => r.json())
+            .then((d) => {
+              const rows = Array.isArray(d?.sections) ? d.sections : [];
+              const normalized = rows
+                .map((row: any) => ({
+                  id: String(row?.id || ''),
+                  label: String(row?.label || ''),
+                  parent_id: row?.parent_id ? String(row.parent_id) : null,
+                  order_index: Number(row?.order_index || 0),
+                }))
+                .filter((row: ForumSectionOption) => !!row.id && !!row.label);
+              setForumSections(normalized);
+            })
+            .catch(() => setForumSections([]));
         }
       } catch {}
     }
@@ -291,6 +353,18 @@ export default function TopicPage() {
     if (!user?.id || !selectedCharacterName) return;
     localStorage.setItem(getForumCharacterStorageKey(Number(user.id)), selectedCharacterName);
   }, [selectedCharacterName, user?.id]);
+
+  useEffect(() => {
+    if (!movePickerOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!movePickerRef.current) return;
+      if (!movePickerRef.current.contains(event.target as Node)) {
+        setMovePickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [movePickerOpen]);
 
   const loadData = async () => {
     try {
@@ -459,14 +533,14 @@ export default function TopicPage() {
     }
   };
 
-  const handleToggleCompleted = async () => {
+  const handleSetTopicStatus = async (status: 'pending' | 'review' | 'solved' | 'denied') => {
     if (!user || !isStaff || !topic) return;
-    setTogglingCompleted(true);
+    setUpdatingStatus(true);
     try {
       const res = await fetch(`/api/forum/topics/${topicId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, completed: !topic.completed }),
+        body: JSON.stringify({ userId: user.id, status }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el estado del tema');
@@ -474,7 +548,44 @@ export default function TopicPage() {
     } catch (err: any) {
       alert(err.message || 'Error actualizando estado del tema');
     } finally {
-      setTogglingCompleted(false);
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleMoveTopicCategory = async () => {
+    if (!user || !isStaff || !topic) return;
+    const target = String(moveTargetCategory || '').trim();
+    if (!target) {
+      alert('Selecciona una sección de destino.');
+      return;
+    }
+    if (target === String(topic.category || '')) {
+      alert('El tema ya está en esa sección.');
+      return;
+    }
+
+    setMovingTopic(true);
+    try {
+      const currentStatus: 'pending' | 'review' | 'solved' | 'denied' = topic.denied
+        ? 'denied'
+        : topic.completed
+          ? 'solved'
+          : topic.in_review
+            ? 'review'
+            : 'pending';
+
+      const res = await fetch(`/api/forum/topics/${topicId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, status: currentStatus, targetCategory: target }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo mover el tema.');
+      await loadData();
+    } catch (err: any) {
+      alert(err?.message || 'Error moviendo el tema');
+    } finally {
+      setMovingTopic(false);
     }
   };
 
@@ -528,7 +639,7 @@ export default function TopicPage() {
         </div>
 
         {/* Topic header panel */}
-        <div className="rounded-3xl border border-purple-900/40 bg-black/50 backdrop-blur-xl px-6 py-5 mb-6 shadow-[0_0_40px_rgba(105,55,180,0.2)]">
+        <div className="relative z-40 overflow-visible rounded-3xl border border-purple-900/40 bg-black/50 backdrop-blur-xl px-6 py-5 mb-6 shadow-[0_0_40px_rgba(105,55,180,0.2)]">
           <div className="flex items-start gap-3 flex-wrap">
             {topic.pinned && <Pin  className="w-5 h-5 text-amber-400 shrink-0 mt-1" />}
             {topic.locked && <Lock className="w-5 h-5 text-rose-400  shrink-0 mt-1" />}
@@ -536,19 +647,140 @@ export default function TopicPage() {
               {topic.title}
             </h1>
             {user && isStaff && (
-              <button
-                onClick={handleToggleCompleted}
-                disabled={togglingCompleted}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                  topic.completed
-                    ? 'border-emerald-700/60 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/50'
-                    : 'border-cyan-700/60 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/45'
-                }`}
-                title="Marcar tema como completado"
-              >
-                <ShieldCheck className="w-4 h-4" />
-                {togglingCompleted ? 'ACTUALIZANDO...' : topic.completed ? 'MARCADO COMPLETADO' : 'MARCAR COMPLETADO'}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => handleSetTopicStatus('pending')}
+                  disabled={updatingStatus}
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                    !topic.completed && !topic.in_review
+                      ? 'border-slate-500/70 bg-slate-800/60 text-slate-100'
+                      : 'border-slate-700/60 bg-slate-950/35 text-slate-300 hover:bg-slate-900/45'
+                  }`}
+                  title="Marcar tema como pendiente"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {updatingStatus ? 'ACTUALIZANDO...' : 'Pendiente'}
+                </button>
+
+                <button
+                  onClick={() => handleSetTopicStatus('review')}
+                  disabled={updatingStatus}
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                    !topic.completed && !!topic.in_review
+                      ? 'border-amber-600/70 bg-amber-900/45 text-amber-200'
+                      : 'border-amber-700/60 bg-amber-950/35 text-amber-300 hover:bg-amber-900/45'
+                  }`}
+                  title="Marcar tema en revisión"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {updatingStatus ? 'ACTUALIZANDO...' : 'En revisión'}
+                </button>
+
+                <button
+                  onClick={() => handleSetTopicStatus('solved')}
+                  disabled={updatingStatus}
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                    topic.completed
+                      ? 'border-emerald-700/70 bg-emerald-950/45 text-emerald-200'
+                      : 'border-emerald-700/60 bg-emerald-950/35 text-emerald-300 hover:bg-emerald-900/45'
+                  }`}
+                  title="Marcar tema como solucionado"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {updatingStatus ? 'ACTUALIZANDO...' : 'Solucionado'}
+                </button>
+
+                <button
+                  onClick={() => handleSetTopicStatus('denied')}
+                  disabled={updatingStatus}
+                  className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-black uppercase tracking-wider transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
+                    topic.denied
+                      ? 'border-rose-700/70 bg-rose-950/45 text-rose-200'
+                      : 'border-rose-700/60 bg-rose-950/35 text-rose-300 hover:bg-rose-900/45'
+                  }`}
+                  title="Marcar tema como denegado"
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  {updatingStatus ? 'ACTUALIZANDO...' : 'Denegado'}
+                </button>
+
+                <div className="inline-flex items-center gap-2 pl-1">
+                  <div className="relative" ref={movePickerRef}>
+                    <button
+                      type="button"
+                      onClick={() => setMovePickerOpen((v) => !v)}
+                      disabled={movingTopic}
+                      className="inline-flex h-9 min-w-[210px] items-center justify-between gap-2 rounded-lg bg-black/50 border border-cyan-500/35 px-3 text-xs text-cyan-100 focus:outline-none focus:border-cyan-400/60 disabled:opacity-60"
+                      title="Seleccionar sección destino"
+                    >
+                      <span className="truncate">{currentMoveTargetLabel}</span>
+                      <span className="text-cyan-300">▾</span>
+                    </button>
+
+                    {movePickerOpen && (
+                      <div className="absolute right-0 mt-2 w-[290px] max-h-80 overflow-y-auto rounded-xl border border-cyan-500/30 bg-[#090f19]/95 shadow-[0_16px_40px_rgba(0,0,0,0.55)] z-[140] p-2">
+                        <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.18em] text-cyan-300 font-black">Mover a sección</p>
+                        <div className="space-y-1">
+                          {moveMainSections.map((main) => {
+                            const children = moveChildrenByParent.get(String(main.id)) || [];
+                            const expanded = expandedMainSection === String(main.id);
+                            const isCurrent = currentMoveTargetId === String(main.id);
+
+                            return (
+                              <div key={`main-${main.id}`} className="rounded-lg border border-cyan-500/15 bg-black/20">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (children.length === 0) {
+                                      setMoveTargetCategory(String(main.id));
+                                      setMovePickerOpen(false);
+                                      return;
+                                    }
+                                    setExpandedMainSection((v) => (v === String(main.id) ? '' : String(main.id)));
+                                  }}
+                                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold transition-colors ${isCurrent ? 'text-cyan-100 bg-cyan-900/25' : 'text-slate-200 hover:bg-cyan-900/15'}`}
+                                >
+                                  <span className="truncate">{main.label}</span>
+                                  <span className="text-cyan-300 text-[10px]">{children.length > 0 ? (expanded ? '▴' : '▾') : '•'}</span>
+                                </button>
+
+                                {expanded && children.length > 0 && (
+                                  <div className="px-2 pb-2 space-y-1">
+                                    {children.map((sub) => {
+                                      const isSelected = currentMoveTargetId === String(sub.id);
+                                      return (
+                                        <button
+                                          key={`sub-${sub.id}`}
+                                          type="button"
+                                          onClick={() => {
+                                            setMoveTargetCategory(String(sub.id));
+                                            setMovePickerOpen(false);
+                                          }}
+                                          className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${isSelected ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100' : 'border-cyan-900/30 bg-black/25 text-slate-200 hover:bg-cyan-900/15'}`}
+                                        >
+                                          ↳ {sub.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleMoveTopicCategory}
+                    disabled={movingTopic || !moveTargetCategory}
+                    className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-cyan-700/60 bg-cyan-950/35 text-cyan-200 hover:bg-cyan-900/45 disabled:opacity-60 disabled:cursor-not-allowed text-xs font-black uppercase tracking-wider transition-all"
+                    title="Mover tema a la sección seleccionada"
+                  >
+                    {movingTopic ? 'MOVIENDO...' : 'Mover'}
+                  </button>
+                </div>
+              </div>
             )}
             {user && isGM && (
               <button
@@ -589,7 +821,7 @@ export default function TopicPage() {
         </div>
 
         {/* Comments */}
-        <div className="space-y-4 mb-8">
+        <div className="relative z-10 space-y-4 mb-8">
           {comments.map((c, idx) => (
             <div
               key={c.id}

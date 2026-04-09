@@ -3,11 +3,18 @@ import { authPool } from '@/lib/db';
 import { calculateVerifier, calculateVerifierLegacy } from '@/lib/srp6';
 import { awardLevelRewardsForAccount } from '@/lib/estelasLevelRewards';
 import { RowDataPacket } from 'mysql2';
+import crypto from 'crypto';
 
 function toBinaryBuffer(value: unknown): Buffer {
   if (!value) return Buffer.alloc(32);
   if (Buffer.isBuffer(value)) return value;
   if (value instanceof Uint8Array) return Buffer.from(value);
+  if (typeof value === 'object' && value !== null) {
+    const maybeBuffer = value as { type?: string; data?: number[] };
+    if (maybeBuffer.type === 'Buffer' && Array.isArray(maybeBuffer.data)) {
+      return Buffer.from(maybeBuffer.data);
+    }
+  }
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (/^[0-9a-fA-F]+$/.test(trimmed) && (trimmed.length === 64 || trimmed.length % 2 === 0)) {
@@ -22,6 +29,18 @@ function toBinaryBuffer(value: unknown): Buffer {
   } catch {
     throw new Error('Formato de credenciales SRP6 no soportado en base de datos');
   }
+}
+
+function calculateShaPassHash(username: string, password: string): string {
+  return crypto
+    .createHash('sha1')
+    .update(`${username.toUpperCase()}:${password.toUpperCase()}`)
+    .digest('hex')
+    .toUpperCase();
+}
+
+function isValidSrpField(field: Buffer | null | undefined): boolean {
+  return Boolean(field && field.length === 32);
 }
 
 export async function POST(request: Request) {
@@ -43,12 +62,24 @@ export async function POST(request: Request) {
       username: string;
       salt: string | Buffer;
       verifier: string | Buffer;
+      sha_pass_hash?: string | null;
     }
 
-    const [rows] = await authPool.query<AccountRow[]>(
-      'SELECT id, username, salt, verifier FROM account WHERE UPPER(username) = UPPER(?)',
-      [normalizedUsername]
-    );
+    let rows: AccountRow[] = [];
+    try {
+      const [result] = await authPool.query<AccountRow[]>(
+        'SELECT id, username, salt, verifier, sha_pass_hash FROM account WHERE UPPER(username) = UPPER(?)',
+        [normalizedUsername]
+      );
+      rows = result;
+    } catch {
+      // Fallback for schemas without sha_pass_hash.
+      const [result] = await authPool.query<AccountRow[]>(
+        'SELECT id, username, salt, verifier FROM account WHERE UPPER(username) = UPPER(?)',
+        [normalizedUsername]
+      );
+      rows = result;
+    }
 
     if (rows.length === 0) {
       return NextResponse.json({ error: 'Usuario no encontrado' }, { status: 401 });
@@ -56,43 +87,47 @@ export async function POST(request: Request) {
 
     const account = rows[0];
 
+    let authenticated = false;
+
+    // 2. Primary auth: SRP6 verifier (AzerothCore default)
     try {
-      // 2. Calculate verifier with provided password and stored salt
-      // AzerothCore stores salt and verifier as binary (BLOB/VARBINARY)
       const storedSalt = toBinaryBuffer(account.salt);
       const storedVerifier = toBinaryBuffer(account.verifier);
 
-      // Use canonical username from DB to avoid casing/spacing differences.
-      const calculatedVerifier = calculateVerifier(account.username, password, storedSalt);
-      const legacyCalculatedVerifier = calculateVerifierLegacy(account.username, password, storedSalt);
-
-      // 3. Compare verifiers
-      if (calculatedVerifier.equals(storedVerifier) || legacyCalculatedVerifier.equals(storedVerifier)) {
-        // Best effort: grant pending milestone estelas on login.
-        awardLevelRewardsForAccount(Number(account.id)).catch((err) => {
-          console.error('Estelas login award error:', err);
-        });
-
-        // SUCCESS
-        return NextResponse.json({ 
-          success: true,
-          message: 'Login successful',
-          user: {
-            id: account.id,
-            username: account.username,
-          }
-        }, { status: 200 });
-      } else {
-        return NextResponse.json({ error: 'Código de acceso incorrecto' }, { status: 401 });
+      if (isValidSrpField(storedSalt) && isValidSrpField(storedVerifier)) {
+        const calculatedVerifier = calculateVerifier(account.username, password, storedSalt);
+        const legacyCalculatedVerifier = calculateVerifierLegacy(account.username, password, storedSalt);
+        authenticated = calculatedVerifier.equals(storedVerifier) || legacyCalculatedVerifier.equals(storedVerifier);
       }
     } catch (cryptoError: unknown) {
-      const errorMsg = cryptoError instanceof Error ? cryptoError.message : 'Error desconocido';
-      console.error('Crypto Error during login:', cryptoError);
-      return NextResponse.json({ 
-        error: 'Error al verificar credenciales',
-        details: errorMsg 
-      }, { status: 500 });
+      // Continue with legacy fallback instead of failing login with 500.
+      console.error('SRP6 verification warning:', cryptoError);
     }
+
+    // 3. Legacy fallback: sha_pass_hash (older TrinityCore-style accounts)
+    if (!authenticated && account.sha_pass_hash) {
+      const expected = String(account.sha_pass_hash || '').trim().toUpperCase();
+      const calculated = calculateShaPassHash(account.username, password);
+      authenticated = expected.length > 0 && expected === calculated;
+    }
+
+    if (!authenticated) {
+      return NextResponse.json({ error: 'Código de acceso incorrecto' }, { status: 401 });
+    }
+
+    // Best effort: grant pending milestone estelas on login.
+    awardLevelRewardsForAccount(Number(account.id)).catch((err) => {
+      console.error('Estelas login award error:', err);
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: 'Login successful',
+      user: {
+        id: account.id,
+        username: account.username,
+      }
+    }, { status: 200 });
 
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error del servidor inesperado';

@@ -35,7 +35,7 @@ async function executeSoapCommand(command: string) {
 
 function parseItemList(raw: string): { entry: number; count: number }[] {
   if (!raw || !raw.trim()) return [];
-  return raw.split(',')
+  return raw.split(/[\n,;]+/)
     .map(s => s.trim())
     .filter(Boolean)
     .map(s => {
@@ -170,6 +170,7 @@ async function deliverProfession(charGuid: number, charName: string, itemId: num
   let skillId = itemId;
   let skillLevel = 450;
   let materialsRaw = '';
+  const PROFESSION_SKILL_CAP = 450;
 
   if (serviceData) {
     try {
@@ -182,10 +183,53 @@ async function deliverProfession(charGuid: number, charName: string, itemId: num
     }
   }
 
-  // Skill via DB (primary) or SOAP (fallback)
+  const professionRanks: Record<number, number> = {
+    171: 51304, 164: 51300, 333: 51313, 202: 51306, 182: 51296,
+    773: 45363, 755: 51311, 165: 51302, 186: 51294, 393: 51296,
+    197: 51309, 185: 51294, 129: 45542, 356: 51294,
+  };
+  const rankSpellId = professionRanks[skillId];
+
+  const [onlineRows]: any = await pool.query(
+    'SELECT online FROM characters WHERE guid = ? LIMIT 1',
+    [charGuid]
+  );
+  const isOnline = Number(onlineRows?.[0]?.online || 0) === 1;
+
+  async function trySoapCommands(commands: string[]): Promise<boolean> {
+    for (const command of commands) {
+      try {
+        await executeSoapCommand(command);
+        return true;
+      } catch {
+        // Try next command variant.
+      }
+    }
+    return false;
+  }
+
+  // Skill via SOAP first (online-safe), DB fallback only if offline.
   if (skillId > 0) {
-    const safeLevel = Math.min(skillLevel, 450);
-    try {
+    const safeLevel = Math.max(1, Math.min(skillLevel, PROFESSION_SKILL_CAP));
+
+    const setSkillApplied = await trySoapCommands([
+      `.setskill ${charName} ${skillId} ${safeLevel} ${safeLevel}`,
+      `.character set skill ${charName} ${skillId} ${safeLevel} ${safeLevel}`,
+      `.character setskill ${charName} ${skillId} ${safeLevel} ${safeLevel}`,
+    ]);
+
+    if (setSkillApplied) {
+      if (rankSpellId) {
+        await trySoapCommands([
+          `.learn ${rankSpellId} ${charName}`,
+          `.character learn ${charName} ${rankSpellId}`,
+        ]);
+      }
+    } else {
+      if (isOnline) {
+        throw new Error('No se pudo aplicar la profesion porque el personaje esta en linea y SOAP fallo. Intenta con el personaje desconectado.');
+      }
+
       const [existing]: any = await pool.query(
         'SELECT guid FROM character_skills WHERE guid = ? AND skill = ? LIMIT 1',
         [charGuid, skillId]
@@ -197,11 +241,12 @@ async function deliverProfession(charGuid: number, charName: string, itemId: num
         await pool.query('INSERT INTO character_skills (guid, skill, value, max) VALUES (?, ?, ?, ?)',
           [charGuid, skillId, safeLevel, safeLevel]);
       }
-    } catch {
-      try {
-        await executeSoapCommand(`.setskill ${charName} ${skillId} ${safeLevel} ${safeLevel}`);
-      } catch {
-        throw new Error('No se pudo aplicar la profesión.');
+
+      if (rankSpellId) {
+        await pool.query(
+          'INSERT IGNORE INTO character_spell (guid, spell, active, disabled) VALUES (?, ?, 1, 0)',
+          [charGuid, rankSpellId]
+        );
       }
     }
   }

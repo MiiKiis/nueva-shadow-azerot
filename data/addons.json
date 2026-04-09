@@ -1,0 +1,21 @@
+[
+  {
+    "id": "prueba-de-addon-1775753148452",
+    "name": "prueba de addon",
+    "url": "https://github.com/azerothcore/mod-anticheat",
+    "description": "este addon es una prueba para el servidor",
+    "images": [
+      "https://i.postimg.cc/fWf2sCLJ/pruebaaa.png",
+      "https://i.postimg.cc/QtwTGR79/2.png",
+      "https://i.postimg.cc/D0Gb2BQw/4.png",
+      "https://i.postimg.cc/0NtSZ62m/fono.png"
+    ],
+    "videoUrl": "https://www.youtube.com/watch?v=DJojVAQqv3o",
+    "categories": [
+      "Misceláneo",
+      "Combate",
+      "Mapa y Minimapa"
+    ],
+    "createdAt": "2026-04-09T16:45:48.452Z"
+  }
+]

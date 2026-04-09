@@ -14,6 +14,8 @@ type TopicRow = RowDataPacket & {
   pinned: number;
   locked: number;
   completed: number;
+  in_review: number;
+  denied: number;
   views: number;
   created_at: string;
   author_username: string;
@@ -25,6 +27,29 @@ type TopicRow = RowDataPacket & {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Error desconocido';
+}
+
+function normalizeLoose(input: string): string {
+  return String(input || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isInSectionTree(startId: string, rootId: string, parentMap: Map<string, string | null>): boolean {
+  let current = String(startId || '');
+  const target = String(rootId || '');
+  const guard = new Set<string>();
+
+  while (current) {
+    if (current === target) return true;
+    if (guard.has(current)) break;
+    guard.add(current);
+    current = String(parentMap.get(current) || '');
+  }
+
+  return false;
 }
 
 // ─── Migraciones one-time (se ejecutan UNA sola vez por proceso) ──────────────
@@ -44,6 +69,8 @@ async function runMigrations(): Promise<void> {
         pinned TINYINT(1) NOT NULL DEFAULT 0,
         locked TINYINT(1) NOT NULL DEFAULT 0,
         completed TINYINT(1) NOT NULL DEFAULT 0,
+        in_review TINYINT(1) NOT NULL DEFAULT 0,
+        denied TINYINT(1) NOT NULL DEFAULT 0,
         views INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -109,6 +136,28 @@ async function runMigrations(): Promise<void> {
       );
     }
 
+    // 3.1 Columna `in_review` para estado intermedio del staff/GM
+    const [reviewRows]: any = await authPool.query(
+      `SELECT 1 AS ok FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'forum_topics' AND COLUMN_NAME = 'in_review' LIMIT 1`
+    );
+    if (!reviewRows?.length) {
+      await authPool.query(
+        'ALTER TABLE forum_topics ADD COLUMN in_review TINYINT(1) NOT NULL DEFAULT 0 AFTER completed'
+      );
+    }
+
+    // 3.2 Columna `denied` para casos rechazados
+    const [deniedRows]: any = await authPool.query(
+      `SELECT 1 AS ok FROM INFORMATION_SCHEMA.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'forum_topics' AND COLUMN_NAME = 'denied' LIMIT 1`
+    );
+    if (!deniedRows?.length) {
+      await authPool.query(
+        'ALTER TABLE forum_topics ADD COLUMN denied TINYINT(1) NOT NULL DEFAULT 0 AFTER in_review'
+      );
+    }
+
     // 4. Migrar category ENUM → VARCHAR
     const [catRows]: any = await authPool.query(
       `SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
@@ -118,6 +167,144 @@ async function runMigrations(): Promise<void> {
       await authPool.query(
         'ALTER TABLE forum_topics MODIFY COLUMN category VARCHAR(64) NOT NULL DEFAULT "general"'
       );
+    }
+
+    // 2.1 Crear sub-secciones de resultado para "Personajes borrados"
+    const [allSections]: any = await authPool.query('SELECT id, label, parent_id FROM forum_sections');
+    const sectionList = Array.isArray(allSections) ? allSections : [];
+    const parentDeletedSection = sectionList.find((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm.includes('personajes-borrados') ||
+        idNorm.includes('personajes_borrados') ||
+        idNorm.includes('deleted-characters') ||
+        labelNorm.includes('personajes borrados') ||
+        labelNorm.includes('personajes eliminados');
+    });
+
+    if (parentDeletedSection?.id) {
+      await authPool.query(
+        `INSERT IGNORE INTO forum_sections (id, label, description, icon, color, border, text_color, parent_id, order_index)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        [
+          'personajes-borrados-solucionado',
+          'Solucionado',
+          'Solicitudes resueltas de personajes borrados',
+          'CheckCircle2',
+          'from-emerald-700 to-emerald-900',
+          'border-emerald-700/50',
+          'text-emerald-300',
+          String(parentDeletedSection.id),
+          90,
+        ]
+      );
+
+      await authPool.query(
+        `INSERT IGNORE INTO forum_sections (id, label, description, icon, color, border, text_color, parent_id, order_index)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
+        [
+          'personajes-borrados-denegado',
+          'Denegado',
+          'Solicitudes rechazadas de personajes borrados',
+          'XCircle',
+          'from-rose-700 to-rose-900',
+          'border-rose-700/50',
+          'text-rose-300',
+          String(parentDeletedSection.id),
+          91,
+        ]
+      );
+    }
+
+    const migrationsParentSection = sectionList.find((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm === 'migrations' || idNorm.includes('migraciones') || labelNorm.includes('migraciones');
+    });
+
+    if (migrationsParentSection?.id) {
+      await authPool.query(
+        `INSERT IGNORE INTO forum_sections (id, label, description, icon, color, border, text_color, parent_id, order_index)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          'migracion-aceptada',
+          'Migración aceptada',
+          'Solicitudes de migración aprobadas',
+          'CheckCircle2',
+          'from-emerald-700 to-emerald-900',
+          'border-emerald-700/50',
+          'text-emerald-300',
+          String(migrationsParentSection.id),
+          80,
+        ]
+      );
+    }
+
+    // 2.2 Reubicar temas existentes (sin borrar datos), solo por estado solucionado:
+    // - Completados del flujo migraciones/personajes borrados -> Migración aceptada
+    const [sectionsAfter]: any = await authPool.query('SELECT id, label, parent_id FROM forum_sections');
+    const sectionsAfterList = Array.isArray(sectionsAfter) ? sectionsAfter : [];
+    const parentMap = new Map<string, string | null>(
+      sectionsAfterList.map((row: any) => [String(row?.id || ''), row?.parent_id ? String(row.parent_id) : null])
+    );
+
+    const deletedParentAfter = sectionsAfterList.find((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm.includes('personajes-borrados') ||
+        idNorm.includes('personajes_borrados') ||
+        idNorm.includes('deleted-characters') ||
+        labelNorm.includes('personajes borrados') ||
+        labelNorm.includes('personajes eliminados');
+    });
+    const deletedParentId = deletedParentAfter?.id ? String(deletedParentAfter.id) : '';
+
+    const migrationsParentAfter = sectionsAfterList.find((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm === 'migrations' || idNorm.includes('migraciones') || labelNorm.includes('migraciones');
+    });
+    const migrationsParentId = migrationsParentAfter?.id ? String(migrationsParentAfter.id) : '';
+
+    const migrationAcceptedSection = sectionsAfterList.find((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm.includes('migracion-aceptada') || labelNorm.includes('migracion aceptada');
+    });
+    const migrationAcceptedId = migrationAcceptedSection?.id ? String(migrationAcceptedSection.id) : '';
+
+    const deletedTreeIds = deletedParentId
+      ? sectionsAfterList
+          .map((row: any) => String(row?.id || ''))
+          .filter((id: string) => isInSectionTree(id, deletedParentId, parentMap))
+      : [];
+    const migrationsTreeIds = migrationsParentId
+      ? sectionsAfterList
+          .map((row: any) => String(row?.id || ''))
+          .filter((id: string) => isInSectionTree(id, migrationsParentId, parentMap))
+      : [];
+
+    if (migrationAcceptedId) {
+      if (deletedTreeIds.length > 0) {
+        await authPool.query(
+          `UPDATE forum_topics
+           SET category = ?, completed = 1, in_review = 0, denied = 0, updated_at = NOW()
+           WHERE completed = 1
+             AND category IN (${deletedTreeIds.map(() => '?').join(',')})`,
+          [migrationAcceptedId, ...deletedTreeIds]
+        );
+      }
+
+      const migrationsCandidates = migrationsTreeIds.filter((id: string) => id !== migrationAcceptedId);
+      if (migrationsCandidates.length > 0) {
+        await authPool.query(
+          `UPDATE forum_topics
+           SET category = ?, completed = 1, in_review = 0, denied = 0, updated_at = NOW()
+           WHERE completed = 1
+             AND category IN (${migrationsCandidates.map(() => '?').join(',')})`,
+          [migrationAcceptedId, ...migrationsCandidates]
+        );
+      }
     }
 
     // 5. Columna `updated_at` — sin ella el ORDER BY falla
@@ -163,6 +350,78 @@ async function runMigrations(): Promise<void> {
   return migrationsRan;
 }
 
+async function reconcileSolvedTopicsToMigrationAccepted(): Promise<void> {
+  const [rows]: any = await authPool.query('SELECT id, label, parent_id FROM forum_sections');
+  const sections = Array.isArray(rows) ? rows : [];
+  if (!sections.length) return;
+
+  const parentMap = new Map<string, string | null>(
+    sections.map((row: any) => [String(row?.id || ''), row?.parent_id ? String(row.parent_id) : null])
+  );
+
+  const migrationAccepted = sections.find((row: any) => {
+    const idNorm = normalizeLoose(String(row?.id || ''));
+    const labelNorm = normalizeLoose(String(row?.label || ''));
+    return idNorm.includes('migracion-aceptada') || labelNorm.includes('migracion aceptada');
+  });
+  const migrationAcceptedId = migrationAccepted?.id ? String(migrationAccepted.id) : '';
+  if (!migrationAcceptedId) return;
+
+  const migrationsParent = sections.find((row: any) => {
+    const idNorm = normalizeLoose(String(row?.id || ''));
+    const labelNorm = normalizeLoose(String(row?.label || ''));
+    return idNorm === 'migrations' || idNorm.includes('migraciones') || labelNorm.includes('migraciones');
+  });
+  const migrationsParentId = migrationsParent?.id ? String(migrationsParent.id) : '';
+
+  const deletedParent = sections.find((row: any) => {
+    const idNorm = normalizeLoose(String(row?.id || ''));
+    const labelNorm = normalizeLoose(String(row?.label || ''));
+    return idNorm.includes('personajes-borrados') ||
+      idNorm.includes('personajes_borrados') ||
+      idNorm.includes('deleted-characters') ||
+      labelNorm.includes('personajes borrados') ||
+      labelNorm.includes('personajes eliminados');
+  });
+  const deletedParentId = deletedParent?.id ? String(deletedParent.id) : '';
+
+  const migrationsTreeIds = migrationsParentId
+    ? sections
+        .map((row: any) => String(row?.id || ''))
+        .filter((id: string) => isInSectionTree(id, migrationsParentId, parentMap))
+    : [];
+  const deletedTreeIds = deletedParentId
+    ? sections
+        .map((row: any) => String(row?.id || ''))
+        .filter((id: string) => isInSectionTree(id, deletedParentId, parentMap))
+    : [];
+
+  const legacySolvedIds = sections
+    .filter((row: any) => {
+      const idNorm = normalizeLoose(String(row?.id || ''));
+      const labelNorm = normalizeLoose(String(row?.label || ''));
+      return idNorm.includes('solucionado') || labelNorm.includes('solucionado');
+    })
+    .map((row: any) => String(row.id));
+
+  const fromCategoryIds = Array.from(new Set([
+    ...migrationsTreeIds.filter((id: string) => id !== migrationAcceptedId),
+    ...deletedTreeIds,
+    ...legacySolvedIds,
+  ])).filter((id) => !!id && id !== migrationAcceptedId);
+
+  if (!fromCategoryIds.length) return;
+
+  await authPool.query(
+    `UPDATE forum_topics
+     SET category = ?, completed = 1, in_review = 0, denied = 0, updated_at = NOW()
+     WHERE category IN (${fromCategoryIds.map(() => '?').join(',')})
+       AND (completed = 1 OR category IN (${legacySolvedIds.length ? legacySolvedIds.map(() => '?').join(',') : 'NULL'}))
+       AND category <> ?`,
+    [migrationAcceptedId, ...fromCategoryIds, ...(legacySolvedIds.length ? legacySolvedIds : []), migrationAcceptedId]
+  );
+}
+
 function resolveRole(gmlevel: number | null): string {
   const lvl = Number(gmlevel ?? 0);
   if (lvl >= 3) return 'GM';
@@ -179,6 +438,7 @@ export async function GET(request: Request) {
   try {
     // Migrations corren una sola vez; en requests subsiguientes es un noop
     await runMigrations();
+    await reconcileSolvedTopicsToMigrationAccepted();
 
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category') || null;
@@ -194,6 +454,8 @@ export async function GET(request: Request) {
          t.pinned,
          t.locked,
          COALESCE(t.completed, 0)          AS completed,
+         COALESCE(t.in_review, 0)          AS in_review,
+        COALESCE(t.denied, 0)             AS denied,
          t.views,
          t.created_at,
          COALESCE(t.updated_at, t.created_at) AS updated_at,
@@ -213,10 +475,12 @@ export async function GET(request: Request) {
          GROUP BY topic_id
        ) fc_agg ON fc_agg.topic_id = t.id
        ${category ? 'WHERE t.category = ?' : ''}
-       GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.completed,
+       GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.completed, t.in_review, t.denied,
                 t.views, t.created_at, t.updated_at, t.author_id, a.username,
                 fc_agg.comment_count, fc_agg.last_reply_at
-       ORDER BY t.pinned DESC, COALESCE(t.updated_at, t.created_at) DESC`,
+       ORDER BY (COALESCE(t.completed, 0) = 1 OR COALESCE(t.denied, 0) = 1) ASC,
+                t.pinned DESC,
+                COALESCE(t.updated_at, t.created_at) DESC`,
       category ? [category] : []
     );
 
@@ -230,6 +494,8 @@ export async function GET(request: Request) {
       pinned: !!r.pinned,
       locked: !!r.locked,
       completed: !!r.completed,
+      in_review: !!r.in_review,
+      denied: !!r.denied,
       views: r.views,
       created_at: r.created_at,
       last_reply_at: r.last_reply_at ?? null,

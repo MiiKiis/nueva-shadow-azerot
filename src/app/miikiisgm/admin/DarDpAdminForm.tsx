@@ -18,6 +18,7 @@ export default function DarDpAdminForm() {
 
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState<'dp' | 'vp'>('dp');
+  const [operation, setOperation] = useState<'add' | 'remove'>('add');
   const [sending, setSending] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [sendError, setSendError] = useState('');
@@ -50,7 +51,7 @@ export default function DarDpAdminForm() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!foundAccount || !amount || Number(amount) <= 0) {
-      setSendError('Ingresa una cantidad válida de DP.');
+      setSendError('Ingresa una cantidad válida de puntos.');
       return;
     }
 
@@ -66,15 +67,19 @@ export default function DarDpAdminForm() {
           targetUsername: foundAccount.username,
           amount: Number(amount),
           currency,
+          operation,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al entregar puntos.');
 
       const currencyName = currency === 'dp' ? 'DP' : 'VP';
-      const newAmount = foundAccount[currency] + Number(amount);
+      const delta = Number(amount);
+      const newAmount = operation === 'add'
+        ? foundAccount[currency] + delta
+        : Math.max(0, foundAccount[currency] - delta);
 
-      setSuccessMsg(`✅ ${amount} ${currencyName} entregados correctamente a ${foundAccount.username}. Ahora tiene ${newAmount} ${currencyName}.`);
+      setSuccessMsg(`✅ ${operation === 'add' ? 'Se agregaron' : 'Se descontaron'} ${amount} ${currencyName} correctamente a ${foundAccount.username}. Ahora tiene ${newAmount} ${currencyName}.`);
       setFoundAccount(prev => prev ? { ...prev, [currency]: newAmount } : null);
       setAmount('');
     } catch (err: unknown) {
@@ -100,8 +105,8 @@ export default function DarDpAdminForm() {
       <div className={`px-8 py-6 border-b flex items-center gap-3 transition-colors ${currency === 'vp' ? 'bg-gradient-to-r from-violet-900/40 to-purple-900/30 border-violet-500/20' : 'bg-gradient-to-r from-yellow-900/40 to-orange-900/30 border-yellow-500/20'}`}>
         <Coins className={`w-8 h-8 ${currency === 'vp' ? 'text-violet-400' : 'text-yellow-400'}`} />
         <div>
-          <h2 className="text-2xl font-black text-white">Entregar {currency === 'dp' ? 'Donation Points' : 'Estelas'}</h2>
-          <p className={`${currency === 'vp' ? 'text-violet-200/50' : 'text-yellow-200/50'} text-sm mt-0.5`}>Busca la cuenta y asigna puntos manualmente</p>
+          <h2 className="text-2xl font-black text-white">{operation === 'add' ? 'Entregar' : 'Quitar'} {currency === 'dp' ? 'Donation Points' : 'Estelas'}</h2>
+          <p className={`${currency === 'vp' ? 'text-violet-200/50' : 'text-yellow-200/50'} text-sm mt-0.5`}>Busca la cuenta y {operation === 'add' ? 'asigna' : 'descuenta'} puntos manualmente</p>
         </div>
       </div>
 
@@ -168,8 +173,19 @@ export default function DarDpAdminForm() {
             {/* PASO 2 – Moneda, Cantidad y enviar */}
             <div>
               <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
-                Paso 2 — Moneda y Cantidad a entregar
+                Paso 2 — Operación, moneda y cantidad
               </p>
+
+              <div className="flex gap-4 mb-4">
+                <label className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${operation === 'add' ? 'border-emerald-500 bg-emerald-900/20 text-emerald-300' : 'border-gray-800 bg-gray-900/50 text-gray-500 hover:border-gray-700 hover:text-gray-300'}`}>
+                  <input type="radio" name="operation" value="add" checked={operation === 'add'} onChange={() => setOperation('add')} className="sr-only" />
+                  <span className="font-bold">Sumar</span>
+                </label>
+                <label className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${operation === 'remove' ? 'border-rose-500 bg-rose-900/20 text-rose-300' : 'border-gray-800 bg-gray-900/50 text-gray-500 hover:border-gray-700 hover:text-gray-300'}`}>
+                  <input type="radio" name="operation" value="remove" checked={operation === 'remove'} onChange={() => setOperation('remove')} className="sr-only" />
+                  <span className="font-bold">Quitar</span>
+                </label>
+              </div>
               
               <div className="flex gap-4 mb-6">
                 <label className={`flex-1 flex items-center justify-center gap-2 p-4 rounded-xl border-2 cursor-pointer transition-all ${currency === 'dp' ? 'border-yellow-500 bg-yellow-900/20 text-yellow-400' : 'border-gray-800 bg-gray-900/50 text-gray-500 hover:border-gray-700 hover:text-gray-300'}`}>
@@ -229,13 +245,17 @@ export default function DarDpAdminForm() {
                   type="submit"
                   disabled={sending || !amount || Number(amount) <= 0}
                   className={`w-full py-4 rounded-xl font-black text-lg uppercase tracking-wider flex items-center justify-center gap-3 transition-all disabled:opacity-40 disabled:cursor-not-allowed text-white ${
-                    currency === 'vp'
-                      ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-[0_4px_20px_rgba(139,92,246,0.35)] hover:scale-[1.01]'
-                      : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-black shadow-[0_4px_20px_rgba(234,179,8,0.35)] hover:scale-[1.01]'
+                    operation === 'remove'
+                      ? 'bg-gradient-to-r from-rose-700 to-red-700 hover:from-rose-600 hover:to-red-600 shadow-[0_4px_20px_rgba(244,63,94,0.35)] hover:scale-[1.01]'
+                      : currency === 'vp'
+                        ? 'bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 shadow-[0_4px_20px_rgba(139,92,246,0.35)] hover:scale-[1.01]'
+                        : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-black shadow-[0_4px_20px_rgba(234,179,8,0.35)] hover:scale-[1.01]'
                   }`}
                 >
-                  <Send className={`w-5 h-5 ${currency === 'dp' && 'text-black'}`} />
-                  {sending ? 'Enviando...' : `Enviar ${amount || '0'} ${currency === 'dp' ? 'DP' : 'VP'} a ${foundAccount.username}`}
+                  <Send className={`w-5 h-5 ${currency === 'dp' && operation === 'add' && 'text-black'}`} />
+                  {sending
+                    ? 'Enviando...'
+                    : `${operation === 'add' ? 'Sumar' : 'Quitar'} ${amount || '0'} ${currency === 'dp' ? 'DP' : 'VP'} a ${foundAccount.username}`}
                 </button>
               </form>
             </div>

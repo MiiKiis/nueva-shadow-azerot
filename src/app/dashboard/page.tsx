@@ -928,6 +928,53 @@ export default function Dashboard() {
                 })}
               </div>
             )}
+
+            <div className="mt-7 relative overflow-hidden rounded-2xl border border-cyan-200/20 bg-gradient-to-br from-[#141a24] via-[#1e2633] to-[#121722] shadow-[0_16px_40px_rgba(2,6,23,0.55)]">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(56,189,248,0.2),transparent_35%),radial-gradient(circle_at_85%_80%,rgba(239,68,68,0.15),transparent_35%)]" />
+              <div className="relative grid grid-cols-1 sm:grid-cols-3">
+                <Link
+                  href="/reclutamiento"
+                  className="group flex items-center gap-3 px-5 py-4 border-b sm:border-b-0 sm:border-r border-cyan-200/15 bg-gradient-to-r from-cyan-900/30 to-sky-900/15 hover:from-cyan-700/35 hover:to-sky-700/25 transition-all duration-300"
+                >
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-full bg-cyan-300/0 group-hover:bg-cyan-300/20 blur-md transition-all duration-300" />
+                    <User className="relative h-6 w-6 text-cyan-100 drop-shadow-[0_0_8px_rgba(103,232,249,0.6)]" />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-cyan-50 font-black text-[13px] tracking-[0.06em] uppercase">Recluta un amigo</p>
+                    <p className="text-cyan-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Reclutamiento</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/migraciones"
+                  className="group flex items-center gap-3 px-5 py-4 border-b sm:border-b-0 sm:border-r border-amber-200/15 bg-gradient-to-r from-amber-900/25 to-orange-900/15 hover:from-amber-700/35 hover:to-orange-700/25 transition-all duration-300"
+                >
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-full bg-amber-300/0 group-hover:bg-amber-300/20 blur-md transition-all duration-300" />
+                    <RefreshCw className="relative h-6 w-6 text-amber-100 drop-shadow-[0_0_8px_rgba(253,230,138,0.6)] group-hover:rotate-90 transition-transform duration-500" />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-amber-50 font-black text-[13px] tracking-[0.06em] uppercase">Migraciones</p>
+                    <p className="text-amber-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Traspasos</p>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/personajes-borrados"
+                  className="group flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-slate-800/50 to-zinc-900/35 hover:from-rose-900/30 hover:to-zinc-900/35 transition-all duration-300"
+                >
+                  <div className="relative">
+                    <div className="absolute -inset-2 rounded-full bg-rose-300/0 group-hover:bg-rose-300/20 blur-md transition-all duration-300" />
+                    <Skull className="relative h-6 w-6 text-rose-100 drop-shadow-[0_0_8px_rgba(253,164,175,0.55)]" />
+                  </div>
+                  <div className="leading-tight">
+                    <p className="text-rose-50 font-black text-[13px] tracking-[0.06em] uppercase">Personajes borrados</p>
+                    <p className="text-rose-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Recuperación</p>
+                  </div>
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>

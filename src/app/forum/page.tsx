@@ -7,6 +7,7 @@ const STATUS_FILTERS = [
   { id: 'pending', label: 'Pendiente' },
   { id: 'review', label: 'En revisión' },
   { id: 'solved', label: 'Solucionado' },
+  { id: 'denied', label: 'Denegado' },
   { id: 'active', label: 'Activo' },
 ];
 
@@ -25,6 +26,8 @@ type Topic = {
   pinned: boolean;
   locked: boolean;
   completed: boolean;
+  in_review?: boolean;
+  denied?: boolean;
   views: number;
   created_at: string;
 };
@@ -130,15 +133,16 @@ export default function ForumPage() {
   const REPORT_TEMPLATE = 'Describe el bug, incluye IDs, pasos y evidencia.';
 
   // Types
-  type TopicStatusFilter = 'all' | 'pending' | 'review' | 'solved' | 'active';
+  type TopicStatusFilter = 'all' | 'pending' | 'review' | 'solved' | 'denied' | 'active';
   type TopicSort = 'latest' | 'popular' | 'replies';
   interface RealmStats { totalAccounts: number; totalCharacters: number; }
 
   // Utility function (placeholder)
   function inferTopicTag(topic: any) {
     // Example logic, adjust as needed
+    if (topic.denied) return { label: 'DENEGADO', style: 'border-rose-700/40 text-rose-300' };
     if (topic.completed) return { label: 'SOLUCIONADO', style: 'border-emerald-700/40 text-emerald-300' };
-    if (topic.locked) return { label: 'EN REVISION', style: 'border-amber-700/40 text-amber-300' };
+    if (topic.in_review) return { label: 'EN REVISION', style: 'border-amber-700/40 text-amber-300' };
     if (topic.pinned) return { label: 'ACTIVO', style: 'border-cyan-700/40 text-cyan-300' };
     return { label: 'PENDIENTE', style: 'border-gray-700/40 text-gray-300' };
   }
@@ -400,13 +404,20 @@ export default function ForumPage() {
     const hasReportControl = !!(reportId || reportCharacter || reportDate);
 
     const hasSubsections = sections.some(s => s.parent_id === activeCategory);
-    const source = hasReportControl
-      ? allTopics
-      : topics;
+    const childCategoryIds = sections
+      .filter((s) => s.parent_id === activeCategory)
+      .map((s) => String(s.id));
+    const shouldAggregateChildren = hasSubsections && !hasReportControl;
+    const source = (hasReportControl || shouldAggregateChildren) ? allTopics : topics;
 
-    const items = (hasSubsections && !hasReportControl)
-      ? []
-      : source.filter((topic) => hasReportControl ? true : topic.category === activeCategory)
+    const items = source.filter((topic) => {
+      if (hasReportControl) return true;
+      if (shouldAggregateChildren) {
+        const allowed = new Set<string>([String(activeCategory), ...childCategoryIds]);
+        return allowed.has(String(topic.category || ''));
+      }
+      return topic.category === activeCategory;
+    })
       .filter((topic) => {
         if (!q) return true;
         return (
@@ -423,6 +434,7 @@ export default function ForumPage() {
         if (statusFilter === 'pending') return tag === 'PENDIENTE';
         if (statusFilter === 'review') return tag === 'EN REVISION';
         if (statusFilter === 'solved') return tag === 'SOLUCIONADO';
+        if (statusFilter === 'denied') return tag === 'DENEGADO';
         if (statusFilter === 'active') return tag === 'ACTIVO';
         return true;
       })
@@ -448,12 +460,23 @@ export default function ForumPage() {
       });
 
     const sorted = [...items];
+    const solvedWeight = (topic: any) => ((topic.completed || topic.denied) ? 1 : 0);
     if (sortBy === 'popular') {
-      sorted.sort((a, b) => b.views - a.views);
+      sorted.sort((a, b) => {
+        const solvedDiff = solvedWeight(a) - solvedWeight(b);
+        if (solvedDiff !== 0) return solvedDiff;
+        return b.views - a.views;
+      });
     } else if (sortBy === 'replies') {
-      sorted.sort((a, b) => b.comment_count - a.comment_count);
+      sorted.sort((a, b) => {
+        const solvedDiff = solvedWeight(a) - solvedWeight(b);
+        if (solvedDiff !== 0) return solvedDiff;
+        return b.comment_count - a.comment_count;
+      });
     } else {
       sorted.sort((a, b) => {
+        const solvedDiff = solvedWeight(a) - solvedWeight(b);
+        if (solvedDiff !== 0) return solvedDiff;
         const aTs = new Date(a.last_reply_at || a.created_at).getTime();
         const bTs = new Date(b.last_reply_at || b.created_at).getTime();
         return bTs - aTs;
@@ -881,6 +904,29 @@ export default function ForumPage() {
                         <MessageSquare className="w-16 h-16 mx-auto mb-4 text-purple-600/20" />
                         <h3 className="text-xl font-black text-white italic uppercase tracking-tighter mb-1 select-none">No hay temas aquí todavía.</h3>
                         {user && <p className="text-gray-500 text-xs font-bold uppercase tracking-widest opacity-80">¡Sé el primero en crear uno!</p>}
+                        {(String(activeCategory).includes('personajes-borrados') || String(activeCategory).includes('migrations')) && (
+                          <p className="mt-2 text-[11px] text-cyan-300/80 font-semibold">Los temas marcados como solucionado se mueven a "Migración aceptada".</p>
+                        )}
+
+                        <div className="mt-8 max-w-2xl mx-auto px-4 text-left">
+                          <p className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-300 mb-2 text-center">Últimos temas</p>
+                          <div className="space-y-2">
+                            {latestTopics.length === 0 ? (
+                              <p className="text-xs text-gray-500 text-center">Aún no hay actividad reciente.</p>
+                            ) : (
+                              latestTopics.map((topic) => (
+                                <Link
+                                  key={`latest-empty-${topic.id}`}
+                                  href={`/forum/${topic.id}`}
+                                  className="block rounded-lg border border-purple-900/30 bg-black/30 px-3 py-2 hover:border-purple-700/50 transition-colors"
+                                >
+                                  <p className="text-xs font-bold text-white truncate text-center sm:text-left">{topic.title}</p>
+                                  <p className="text-[10px] text-gray-500 mt-0.5 text-center sm:text-left">{timeAgo(topic.created_at)}</p>
+                                </Link>
+                              ))
+                            )}
+                          </div>
+                        </div>
                       </>
                    )}
                 </div>
@@ -1058,26 +1104,6 @@ export default function ForumPage() {
               <div className="rounded-xl border border-cyan-700/30 bg-cyan-950/20 p-3">
                 <p className="text-sm font-black text-emerald-300">Operativo</p>
                 <p className="text-xs text-gray-400 mt-1">Cuentas: {realmStats?.totalAccounts ?? '...'} · Personajes: {realmStats?.totalCharacters ?? '...'}</p>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-300 mb-2">Últimos temas</p>
-              <div className="space-y-2">
-                {latestTopics.length === 0 ? (
-                  <p className="text-xs text-gray-500">Aún no hay actividad reciente.</p>
-                ) : (
-                  latestTopics.map((topic) => (
-                    <Link
-                      key={`latest-${topic.id}`}
-                      href={`/forum/${topic.id}`}
-                      className="block rounded-lg border border-purple-900/30 bg-black/30 px-3 py-2 hover:border-purple-700/50 transition-colors"
-                    >
-                      <p className="text-xs font-bold text-white truncate">{topic.title}</p>
-                      <p className="text-[10px] text-gray-500 mt-0.5">{timeAgo(topic.created_at)}</p>
-                    </Link>
-                  ))
-                )}
               </div>
             </div>
 

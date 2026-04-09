@@ -48,9 +48,24 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
     const [recaptchaReady, setRecaptchaReady] = useState(false);
     const [copied, setCopied] = useState(false);
     const [checkingSession, setCheckingSession] = useState(true);
+    const [inviteToken, setInviteToken] = useState('');
 
     // Si ya hay sesión iniciada, siempre enviar al dashboard
     useEffect(() => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const token = String(params.get('ref') || '').trim();
+        const forceRegister = params.get('register') === '1';
+        if (token || forceRegister) {
+          if (token) setInviteToken(token);
+          setIsLogin(false);
+          setIsRecover(false);
+          setShowModal(true);
+        }
+      } catch {
+        // ignore URL parse issues
+      }
+
       try {
         const storedUser = localStorage.getItem('user');
         if (!storedUser) {
@@ -212,6 +227,7 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
               pin: formData.pin,
               recaptchaToken,
               faction: faction || 'horde',
+              inviteToken: inviteToken || undefined,
             };
 
         const res = await fetch(endpoint, {
@@ -413,6 +429,12 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
             <h2 className="text-center text-3xl font-black uppercase tracking-wide text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] mb-6">
               {isRecover ? 'Recuperar Cuenta' : isLogin ? 'Iniciar sesión ahora' : 'Crear cuenta ahora'}
             </h2>
+
+            {!isLogin && !!inviteToken && (
+              <div className="mb-4 rounded-2xl border border-cyan-400/40 bg-cyan-900/25 px-4 py-3 text-xs font-bold uppercase tracking-wider text-cyan-200">
+                Registro vinculado a Recluta un Amigo
+              </div>
+            )}
 
             <form ref={formRef} onSubmit={isRecover ? handleRecoverSubmit : handleSubmit} className="space-y-5">
               {error && (

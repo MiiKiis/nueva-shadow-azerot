@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MessageSquare, Package, Puzzle, Send, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Package, Puzzle, Send, ShieldCheck, FileText, ExternalLink, Youtube, Image as ImageIcon, ChevronDown, ChevronRight } from 'lucide-react';
+import { ADDON_CATEGORIES, parseImagesFromTextarea, type AddonCategory } from '@/lib/addons';
 
-type R1Tab = 'shop' | 'addons' | 'forum';
+type R1Tab = 'shop' | 'addons' | 'forum' | 'requests';
 
 type Submission = {
   id: number;
@@ -12,12 +13,27 @@ type Submission = {
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   review_note?: string | null;
+  payload?: any;
 };
 
 type CharacterOption = {
   guid: number;
   name: string;
   level: number;
+};
+
+type ShopCategory = {
+  id: number;
+  slug: string;
+  name: string;
+  parent_id?: number | null;
+};
+
+type ForumSection = {
+  id: string;
+  label: string;
+  parent_id?: string | null;
+  order_index?: number;
 };
 
 export default function GmR1PanelPage() {
@@ -29,7 +45,7 @@ export default function GmR1PanelPage() {
   const [success, setSuccess] = useState('');
   const [submissions, setSubmissions] = useState<Submission[]>([]);
 
-  const [shopCategories, setShopCategories] = useState<Array<{ id: number; slug: string; name: string; parent_id?: number | null }>>([]);
+  const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
   const [shopForm, setShopForm] = useState({
     name: '',
     priceDp: '',
@@ -39,12 +55,24 @@ export default function GmR1PanelPage() {
     description: '',
     bundleItems: [{ id: '', count: '1' }],
   });
-  const [categorySearch, setCategorySearch] = useState('');
+  const [shopCategoryPickerOpen, setShopCategoryPickerOpen] = useState(false);
+  const [expandedShopMainCategoryId, setExpandedShopMainCategoryId] = useState<number | null>(null);
+  const shopCategoryPickerRef = useRef<HTMLDivElement>(null);
 
-  const [addonForm, setAddonForm] = useState({ name: '', url: '' });
-  const [forumSections, setForumSections] = useState<Array<{ id: string; label: string; parent_id?: string | null }>>([]);
+  const [addonForm, setAddonForm] = useState({
+    name: '',
+    url: '',
+    description: '',
+    imagesText: '',
+    videoUrl: '',
+    categories: ['Misceláneo'] as AddonCategory[],
+  });
+  const [forumSections, setForumSections] = useState<ForumSection[]>([]);
   const [forumCharacters, setForumCharacters] = useState<CharacterOption[]>([]);
   const [forumForm, setForumForm] = useState({ title: '', category: 'announcements', comment: '', characterName: '' });
+  const [forumCategoryPickerOpen, setForumCategoryPickerOpen] = useState(false);
+  const [expandedForumMainSectionId, setExpandedForumMainSectionId] = useState('');
+  const forumCategoryPickerRef = useRef<HTMLDivElement>(null);
 
   const statusCount = useMemo(() => {
     const base = { pending: 0, approved: 0, rejected: 0 };
@@ -58,7 +86,23 @@ export default function GmR1PanelPage() {
   };
 
   const orderedShopCategories = [...shopCategories].sort((a, b) => Number(a.id) - Number(b.id));
-  const categoryById = new Map(orderedShopCategories.map((c) => [Number(c.id), c]));
+  const categoryById = new Map<number, ShopCategory>(orderedShopCategories.map((c) => [Number(c.id), c]));
+  const categoryChildrenByParent = useMemo(() => {
+    const byParent = new Map<number | null, ShopCategory[]>();
+
+    for (const category of orderedShopCategories) {
+      const parentId = normalizeParentId(category.parent_id);
+      const list = byParent.get(parentId) || [];
+      list.push(category);
+      byParent.set(parentId, list);
+    }
+
+    for (const [key, list] of byParent.entries()) {
+      byParent.set(key, [...list].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+
+    return byParent;
+  }, [orderedShopCategories]);
 
   const categoryOptions = orderedShopCategories.map((cat) => {
     const parts = [cat.name];
@@ -81,11 +125,46 @@ export default function GmR1PanelPage() {
     };
   });
 
-  const filteredCategoryOptions = categoryOptions.filter((opt) =>
-    opt.label.toLowerCase().includes(categorySearch.trim().toLowerCase())
+  const shopMainCategories = useMemo(
+    () => (categoryChildrenByParent.get(null) || []).sort((a, b) => a.name.localeCompare(b.name)),
+    [categoryChildrenByParent]
   );
 
+  const sortedForumSections = useMemo(() => {
+    return [...forumSections].sort((a, b) => {
+      const ao = Number(a.order_index || 0);
+      const bo = Number(b.order_index || 0);
+      if (ao !== bo) return ao - bo;
+      return String(a.label || '').localeCompare(String(b.label || ''));
+    });
+  }, [forumSections]);
+
+  const forumMainSections = useMemo(
+    () => sortedForumSections.filter((section) => !section.parent_id),
+    [sortedForumSections]
+  );
+
+  const forumChildrenByParent = useMemo(() => {
+    const map = new Map<string, ForumSection[]>();
+    for (const section of sortedForumSections) {
+      const parentId = section.parent_id ? String(section.parent_id) : '';
+      if (!parentId) continue;
+      const list = map.get(parentId) || [];
+      list.push(section);
+      map.set(parentId, list);
+    }
+    return map;
+  }, [sortedForumSections]);
+
+  const selectedForumSectionLabel =
+    sortedForumSections.find((section) => String(section.id) === String(forumForm.category || ''))?.label ||
+    'Seleccionar sección';
+
   const selectedCategoryPath = categoryOptions.find((c) => c.slug === shopForm.category)?.label || 'Sin categoría seleccionada';
+
+  const selectedShopCategoryLabel =
+    orderedShopCategories.find((category) => String(category.slug) === String(shopForm.category || ''))?.name ||
+    'Seleccionar categoría';
 
   const loadSubmissions = async (uid: number) => {
     const res = await fetch(`/api/gm/r1/submissions?userId=${uid}`);
@@ -127,7 +206,16 @@ export default function GmR1PanelPage() {
         const sectionData = await sectionRes.json();
         const charData = await charRes.json();
         setShopCategories(Array.isArray(catData) ? catData : []);
-        const sections = Array.isArray(sectionData?.sections) ? sectionData.sections : [];
+        const sections = Array.isArray(sectionData?.sections)
+          ? sectionData.sections
+              .map((section: any) => ({
+                id: String(section?.id || ''),
+                label: String(section?.label || ''),
+                parent_id: section?.parent_id ? String(section.parent_id) : null,
+                order_index: Number(section?.order_index || 0),
+              }))
+              .filter((section: ForumSection) => !!section.id && !!section.label)
+          : [];
         const chars = Array.isArray(charData?.characters) ? charData.characters : [];
         const charOptions: CharacterOption[] = chars
           .map((c: any) => ({ guid: Number(c?.guid || 0), name: String(c?.name || ''), level: Number(c?.level || 0) }))
@@ -151,6 +239,30 @@ export default function GmR1PanelPage() {
 
     init();
   }, [router]);
+
+  useEffect(() => {
+    if (!forumCategoryPickerOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!forumCategoryPickerRef.current) return;
+      if (!forumCategoryPickerRef.current.contains(event.target as Node)) {
+        setForumCategoryPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [forumCategoryPickerOpen]);
+
+  useEffect(() => {
+    if (!shopCategoryPickerOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!shopCategoryPickerRef.current) return;
+      if (!shopCategoryPickerRef.current.contains(event.target as Node)) {
+        setShopCategoryPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [shopCategoryPickerOpen]);
 
   const sendSubmission = async (type: 'shop' | 'addon' | 'forum', payload: any) => {
     setError('');
@@ -204,11 +316,28 @@ export default function GmR1PanelPage() {
   const handleSubmitAddon = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await sendSubmission('addon', addonForm);
-      setAddonForm({ name: '', url: '' });
+      await sendSubmission('addon', {
+        name: addonForm.name,
+        url: addonForm.url,
+        description: addonForm.description,
+        images: parseImagesFromTextarea(addonForm.imagesText),
+        videoUrl: addonForm.videoUrl,
+        categories: addonForm.categories,
+      });
+      setAddonForm({ name: '', url: '', description: '', imagesText: '', videoUrl: '', categories: ['Misceláneo'] });
     } catch (err: any) {
       setError(err.message || 'Error enviando solicitud de addon');
     }
+  };
+
+  const toggleAddonCategory = (category: AddonCategory) => {
+    setAddonForm((prev) => {
+      if (prev.categories.includes(category)) {
+        const next = prev.categories.filter((entry) => entry !== category);
+        return { ...prev, categories: next.length ? next : ['Misceláneo'] };
+      }
+      return { ...prev, categories: [...prev.categories, category] };
+    });
   };
 
   const handleSubmitForum = async (e: React.FormEvent) => {
@@ -241,6 +370,7 @@ export default function GmR1PanelPage() {
             { id: 'shop', label: 'Tienda', icon: <Package className="w-4 h-4" /> },
             { id: 'addons', label: 'Addons', icon: <Puzzle className="w-4 h-4" /> },
             { id: 'forum', label: 'Post Foro', icon: <MessageSquare className="w-4 h-4" /> },
+            { id: 'requests', label: 'Solicitudes', icon: <FileText className="w-4 h-4" /> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -273,30 +403,69 @@ export default function GmR1PanelPage() {
             <input className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" placeholder="Icono o URL imagen" value={shopForm.image} onChange={(e) => setShopForm((p) => ({ ...p, image: e.target.value }))} />
             <input className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" type="number" placeholder="Precio DP" value={shopForm.priceDp} onChange={(e) => setShopForm((p) => ({ ...p, priceDp: e.target.value }))} />
             <input className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" type="number" placeholder="Precio VP" value={shopForm.priceVp} onChange={(e) => setShopForm((p) => ({ ...p, priceVp: e.target.value }))} />
-            <input
-              className="md:col-span-2 bg-black/40 border border-cyan-500/30 rounded-xl px-4 py-3 text-cyan-100"
-              placeholder="Buscar categoría o subcategoría (ej: horda, warrior, tier 9...)"
-              value={categorySearch}
-              onChange={(e) => setCategorySearch(e.target.value)}
-            />
-            <div className="md:col-span-2 rounded-xl border border-white/10 bg-black/30 p-2 max-h-56 overflow-y-auto">
-              {filteredCategoryOptions.length === 0 ? (
-                <p className="px-3 py-2 text-xs font-bold text-amber-300">No se encontraron categorías con ese filtro.</p>
-              ) : (
-                filteredCategoryOptions.map((c) => {
-                  const isSelected = shopForm.category === c.slug;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setShopForm((p) => ({ ...p, category: c.slug }))}
-                      className={`w-full text-left px-3 py-2 rounded-lg border transition-all ${isSelected ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-100' : 'bg-white/[0.02] border-white/5 text-gray-200 hover:bg-white/[0.06] hover:border-white/20'}`}
-                    >
-                      <p className="text-sm font-bold leading-tight">{c.label}</p>
-                      <p className="text-[10px] text-gray-400 font-mono mt-1">slug: {c.slug}</p>
-                    </button>
-                  );
-                })
+            <div className="md:col-span-2 relative" ref={shopCategoryPickerRef}>
+              <label className="text-[10px] uppercase tracking-[0.16em] text-cyan-300 font-black block mb-2">Categoría</label>
+              <button
+                type="button"
+                onClick={() => setShopCategoryPickerOpen((v) => !v)}
+                className="w-full inline-flex items-center justify-between gap-2 bg-black/40 border border-cyan-500/30 rounded-xl px-4 py-3 text-cyan-100"
+              >
+                <span className="truncate">{selectedShopCategoryLabel}</span>
+                <span className="text-cyan-300">▾</span>
+              </button>
+
+              {shopCategoryPickerOpen && (
+                <div className="absolute left-0 right-0 mt-2 max-h-80 overflow-y-auto rounded-xl border border-cyan-500/30 bg-[#0a1222]/95 shadow-[0_12px_34px_rgba(0,0,0,.5)] z-50 p-2">
+                  <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.16em] text-cyan-300 font-black">Categorías de tienda</p>
+                  <div className="space-y-1">
+                    {shopMainCategories.map((main) => {
+                      const children = (categoryChildrenByParent.get(Number(main.id)) || []).sort((a, b) => a.name.localeCompare(b.name));
+                      const expanded = expandedShopMainCategoryId === Number(main.id);
+                      const selectedMain = shopForm.category === main.slug;
+
+                      return (
+                        <div key={`shop-main-${main.id}`} className="rounded-lg border border-cyan-500/15 bg-black/20">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (children.length === 0) {
+                                setShopForm((p) => ({ ...p, category: main.slug }));
+                                setShopCategoryPickerOpen(false);
+                                return;
+                              }
+                              setExpandedShopMainCategoryId((v) => (v === Number(main.id) ? null : Number(main.id)));
+                            }}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold transition-colors ${selectedMain ? 'bg-cyan-900/25 text-cyan-100' : 'text-slate-200 hover:bg-cyan-900/15'}`}
+                          >
+                            <span className="truncate">{main.name}</span>
+                            <span className="text-cyan-300 text-[10px]">{children.length > 0 ? (expanded ? '▴' : '▾') : '•'}</span>
+                          </button>
+
+                          {expanded && children.length > 0 && (
+                            <div className="px-2 pb-2 space-y-1">
+                              {children.map((sub) => {
+                                const selectedSub = shopForm.category === sub.slug;
+                                return (
+                                  <button
+                                    key={`shop-sub-${sub.id}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setShopForm((p) => ({ ...p, category: sub.slug }));
+                                      setShopCategoryPickerOpen(false);
+                                    }}
+                                    className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${selectedSub ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100' : 'border-cyan-900/30 bg-black/25 text-slate-200 hover:bg-cyan-900/15'}`}
+                                  >
+                                    ↳ {sub.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               )}
             </div>
             <div className="md:col-span-2 bg-purple-900/10 border border-purple-500/20 p-4 rounded-2xl space-y-3">
@@ -374,6 +543,28 @@ export default function GmR1PanelPage() {
           <form onSubmit={handleSubmitAddon} className="rounded-2xl border border-white/10 bg-[#0b1020] p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <input className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" placeholder="Nombre addon" value={addonForm.name} onChange={(e) => setAddonForm((p) => ({ ...p, name: e.target.value }))} required />
             <input className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" placeholder="URL addon" value={addonForm.url} onChange={(e) => setAddonForm((p) => ({ ...p, url: e.target.value }))} required />
+            <textarea className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 min-h-[90px]" placeholder="Descripcion" value={addonForm.description} onChange={(e) => setAddonForm((p) => ({ ...p, description: e.target.value }))} />
+            <textarea className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 min-h-[90px]" placeholder={"Imagenes (1 URL por linea)\nhttps://cdn.ejemplo.com/a1.jpg"} value={addonForm.imagesText} onChange={(e) => setAddonForm((p) => ({ ...p, imagesText: e.target.value }))} />
+            <input className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3" placeholder="Link video YouTube opcional" value={addonForm.videoUrl} onChange={(e) => setAddonForm((p) => ({ ...p, videoUrl: e.target.value }))} />
+            <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 rounded-xl border border-white/10 bg-black/20 p-3">
+              {ADDON_CATEGORIES.map((category) => {
+                const active = addonForm.categories.includes(category);
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => toggleAddonCategory(category)}
+                    className={`text-left px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                      active
+                        ? 'border-pink-400/60 bg-pink-500/20 text-pink-100'
+                        : 'border-white/15 bg-black/30 text-gray-300 hover:border-pink-400/40'
+                    }`}
+                  >
+                    {category}
+                  </button>
+                );
+              })}
+            </div>
             <button className="md:col-span-2 bg-gradient-to-r from-pink-700 to-rose-700 rounded-xl px-4 py-3 font-black flex items-center justify-center gap-2"><Send className="w-4 h-4" /> Enviar Solicitud de Addon</button>
           </form>
         )}
@@ -393,13 +584,131 @@ export default function GmR1PanelPage() {
                 forumCharacters.map((c) => <option key={c.guid} value={c.name}>{c.name} (lvl {c.level})</option>)
               )}
             </select>
-            <select className="bg-black/40 border border-white/10 rounded-xl px-4 py-3" value={forumForm.category} onChange={(e) => setForumForm((p) => ({ ...p, category: e.target.value }))}>
-              {forumSections.map((s) => <option key={s.id} value={s.id}>{s.parent_id ? `↳ ${s.label}` : s.label}</option>)}
-            </select>
+            <div className="relative" ref={forumCategoryPickerRef}>
+              <button
+                type="button"
+                onClick={() => setForumCategoryPickerOpen((v) => !v)}
+                className="w-full inline-flex items-center justify-between gap-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white"
+              >
+                <span className="truncate">{selectedForumSectionLabel}</span>
+                <span className="text-cyan-300">▾</span>
+              </button>
+
+              {forumCategoryPickerOpen && (
+                <div className="absolute left-0 right-0 mt-2 max-h-80 overflow-y-auto rounded-xl border border-cyan-500/30 bg-[#0a1222]/95 shadow-[0_12px_34px_rgba(0,0,0,.5)] z-50 p-2">
+                  <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.16em] text-cyan-300 font-black">Categorías del foro</p>
+                  <div className="space-y-1">
+                    {forumMainSections.map((main) => {
+                      const children = forumChildrenByParent.get(String(main.id)) || [];
+                      const expanded = expandedForumMainSectionId === String(main.id);
+                      const selectedMain = String(forumForm.category) === String(main.id);
+
+                      return (
+                        <div key={`forum-main-${main.id}`} className="rounded-lg border border-cyan-500/15 bg-black/20">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (children.length === 0) {
+                                setForumForm((p) => ({ ...p, category: String(main.id) }));
+                                setForumCategoryPickerOpen(false);
+                                return;
+                              }
+                              setExpandedForumMainSectionId((v) => (v === String(main.id) ? '' : String(main.id)));
+                            }}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold transition-colors ${selectedMain ? 'bg-cyan-900/25 text-cyan-100' : 'text-slate-200 hover:bg-cyan-900/15'}`}
+                          >
+                            <span className="truncate">{main.label}</span>
+                            <span className="text-cyan-300 text-[10px]">{children.length > 0 ? (expanded ? '▴' : '▾') : '•'}</span>
+                          </button>
+
+                          {expanded && children.length > 0 && (
+                            <div className="px-2 pb-2 space-y-1">
+                              {children.map((sub) => {
+                                const selectedSub = String(forumForm.category) === String(sub.id);
+                                return (
+                                  <button
+                                    key={`forum-sub-${sub.id}`}
+                                    type="button"
+                                    onClick={() => {
+                                      setForumForm((p) => ({ ...p, category: String(sub.id) }));
+                                      setForumCategoryPickerOpen(false);
+                                    }}
+                                    className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${selectedSub ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100' : 'border-cyan-900/30 bg-black/25 text-slate-200 hover:bg-cyan-900/15'}`}
+                                  >
+                                    ↳ {sub.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="md:col-span-2 text-xs text-amber-300 flex items-center">Por seguridad, el post se publica con nombre de personaje (no con nombre de cuenta).</div>
             <textarea className="md:col-span-2 bg-black/40 border border-white/10 rounded-xl px-4 py-3 min-h-[120px]" placeholder="Mensaje" value={forumForm.comment} onChange={(e) => setForumForm((p) => ({ ...p, comment: e.target.value }))} required />
             <button disabled={!forumForm.characterName || forumCharacters.length === 0} className="md:col-span-2 bg-gradient-to-r from-purple-700 to-indigo-700 rounded-xl px-4 py-3 font-black flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"><Send className="w-4 h-4" /> Enviar Solicitud de Post</button>
           </form>
+        )}
+
+        {activeTab === 'requests' && (
+          <div className="space-y-4">
+            {submissions.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-[#0b1020] p-6 text-gray-400 font-bold">No hay solicitudes todavía.</div>
+            ) : (
+              submissions.map((s) => (
+                <div key={s.id} className="rounded-2xl border border-white/10 bg-[#0b1020] p-5 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs uppercase tracking-wider text-gray-400 font-black">#{s.id} · {s.submission_type.toUpperCase()} · {new Date(s.created_at).toLocaleString()}</p>
+                    <span className={`px-2 py-1 rounded text-[11px] font-black uppercase tracking-wider ${
+                      s.status === 'pending' ? 'bg-amber-900/40 text-amber-300' : s.status === 'approved' ? 'bg-emerald-900/40 text-emerald-300' : 'bg-rose-900/40 text-rose-300'
+                    }`}>
+                      {s.status}
+                    </span>
+                  </div>
+
+                  {s.submission_type === 'addon' && (
+                    <div className="rounded-xl border border-pink-500/20 bg-pink-900/10 p-3 space-y-2">
+                      <p className="text-sm font-black text-pink-100">{String(s.payload?.name || 'Addon sin nombre')}</p>
+                      {!!s.payload?.description && <p className="text-xs text-gray-300">{String(s.payload.description)}</p>}
+                      <div className="flex flex-wrap gap-2 text-xs">
+                        {!!s.payload?.url && (
+                          <a href={String(s.payload.url)} target="_blank" rel="noopener" className="text-blue-300 hover:text-blue-200 inline-flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Enlace addon
+                          </a>
+                        )}
+                        {!!s.payload?.videoUrl && (
+                          <a href={String(s.payload.videoUrl)} target="_blank" rel="noopener" className="text-rose-300 hover:text-rose-200 inline-flex items-center gap-1">
+                            <Youtube className="w-3 h-3" /> Video
+                          </a>
+                        )}
+                        {Array.isArray(s.payload?.images) && s.payload.images.length > 0 && (
+                          <span className="text-gray-300 inline-flex items-center gap-1"><ImageIcon className="w-3 h-3" /> {s.payload.images.length} imagen(es)</span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(Array.isArray(s.payload?.categories) ? s.payload.categories : []).map((cat: string) => (
+                          <span key={`${s.id}-${cat}`} className="px-2 py-1 text-[10px] uppercase tracking-wider rounded-md border border-white/15 bg-white/5 text-gray-300">{cat}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {s.submission_type !== 'addon' && (
+                    <details className="text-xs bg-black/40 border border-white/5 rounded-xl p-3 text-cyan-100">
+                      <summary className="cursor-pointer text-gray-300 font-black uppercase tracking-wider">Ver detalle tecnico (JSON)</summary>
+                      <pre className="mt-2 overflow-auto whitespace-pre-wrap">{JSON.stringify(s.payload || {}, null, 2)}</pre>
+                    </details>
+                  )}
+
+                  {!!s.review_note && <p className="text-xs text-amber-300">Nota admin: {s.review_note}</p>}
+                </div>
+              ))
+            )}
+          </div>
         )}
       </div>
     </main>

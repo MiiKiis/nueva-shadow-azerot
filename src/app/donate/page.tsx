@@ -28,6 +28,9 @@ function CatManagerPanel({
   const orderedCategories = [...categories].sort((a, b) => Number(a.id) - Number(b.id));
   const rootCategories = orderedCategories.filter(c => normalizeParentId(c.parent_id) === null);
   const getChildren = (parentId: number) => orderedCategories.filter(c => normalizeParentId(c.parent_id) === Number(parentId));
+  const [parentPickerOpen, setParentPickerOpen] = React.useState(false);
+  const [expandedParentMainId, setExpandedParentMainId] = React.useState<string>('');
+  const parentPickerRef = React.useRef<HTMLDivElement>(null);
 
   const renderParentOptions = (
     nodes: { id: number; slug: string; name: string; description?: string; image?: string; parent_id?: number | null }[],
@@ -79,6 +82,25 @@ function CatManagerPanel({
   const [form, setForm] = React.useState({ slug: '', name: '', description: '', image_url: '', parent_id: '' });
   const [saving, setSaving] = React.useState(false);
   const [msg, setMsg] = React.useState('');
+
+  const selectedParentLabel = React.useMemo(() => {
+    const selectedId = Number(form.parent_id || 0);
+    if (!selectedId) return '-- Sección Principal --';
+    const selected = orderedCategories.find((category) => Number(category.id) === selectedId);
+    return selected?.name || '-- Sección Principal --';
+  }, [form.parent_id, orderedCategories]);
+
+  React.useEffect(() => {
+    if (!parentPickerOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!parentPickerRef.current) return;
+      if (!parentPickerRef.current.contains(event.target as Node)) {
+        setParentPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [parentPickerOpen]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,11 +156,81 @@ function CatManagerPanel({
         </div>
         <div>
           <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">Categoría Padre (opcional)</label>
-          <select className="w-full bg-black/60 border border-amber-500/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-400/50 cursor-pointer"
-            value={form.parent_id} onChange={e => setForm({ ...form, parent_id: e.target.value })}>
-            <option value="">-- Sección Principal --</option>
-            {renderParentOptions(rootCategories)}
-          </select>
+          <div className="relative" ref={parentPickerRef}>
+            <button
+              type="button"
+              onClick={() => setParentPickerOpen((v) => !v)}
+              className="w-full bg-black/60 border border-amber-500/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-400/50 cursor-pointer inline-flex items-center justify-between gap-2"
+            >
+              <span className="truncate">{selectedParentLabel}</span>
+              <span className="text-amber-300">▾</span>
+            </button>
+
+            {parentPickerOpen && (
+              <div className="absolute left-0 right-0 mt-2 max-h-80 overflow-y-auto rounded-xl border border-amber-500/30 bg-[#12161f]/95 shadow-[0_14px_34px_rgba(0,0,0,0.45)] z-50 p-2">
+                <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.16em] text-amber-300 font-black">Categorías principales</p>
+                <div className="space-y-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm({ ...form, parent_id: '' });
+                      setParentPickerOpen(false);
+                    }}
+                    className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${!form.parent_id ? 'border-amber-400/50 bg-amber-500/20 text-amber-100' : 'border-amber-900/30 bg-black/25 text-slate-200 hover:bg-amber-900/15'}`}
+                  >
+                    -- Sección Principal --
+                  </button>
+
+                  {rootCategories.map((main) => {
+                    const children = getChildren(Number(main.id));
+                    const expanded = expandedParentMainId === String(main.id);
+                    const selectedMain = String(form.parent_id || '') === String(main.id);
+
+                    return (
+                      <div key={`parent-main-${main.id}`} className="rounded-lg border border-amber-500/15 bg-black/20">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (children.length === 0) {
+                              setForm({ ...form, parent_id: String(main.id) });
+                              setParentPickerOpen(false);
+                              return;
+                            }
+                            setExpandedParentMainId((v) => (v === String(main.id) ? '' : String(main.id)));
+                          }}
+                          className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold transition-colors ${selectedMain ? 'bg-amber-900/25 text-amber-100' : 'text-slate-200 hover:bg-amber-900/15'}`}
+                        >
+                          <span className="truncate">{main.name}</span>
+                          <span className="text-amber-300 text-[10px]">{children.length > 0 ? (expanded ? '▴' : '▾') : '•'}</span>
+                        </button>
+
+                        {expanded && children.length > 0 && (
+                          <div className="px-2 pb-2 space-y-1">
+                            {children.map((sub) => {
+                              const selectedSub = String(form.parent_id || '') === String(sub.id);
+                              return (
+                                <button
+                                  key={`parent-sub-${sub.id}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setForm({ ...form, parent_id: String(sub.id) });
+                                    setParentPickerOpen(false);
+                                  }}
+                                  className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${selectedSub ? 'border-amber-400/50 bg-amber-500/20 text-amber-100' : 'border-amber-900/30 bg-black/25 text-slate-200 hover:bg-amber-900/15'}`}
+                                >
+                                  ↳ {sub.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         <div className="sm:col-span-2 lg:col-span-2">
           <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-1">URL de Imagen (opcional)</label>
@@ -235,6 +327,7 @@ type CharacterOption = {
   class?: number;
   level?: number;
   race?: number;
+  online?: number;
 };
 
 type ShopItem = {
@@ -881,6 +974,18 @@ export default function DonatePage() {
     if (!targetGuid) { setPurchaseError(isGift ? 'Busca y selecciona un personaje destino.' : 'Selecciona un personaje.'); setIsPurchaseLocked(false); purchaseLock.current = false; return; }
     if (isGift && !/^\d{4}$/.test(giftPin.trim())) { setPurchaseError('PIN de 4 dígitos requerido.'); setIsPurchaseLocked(false); purchaseLock.current = false; return; }
 
+    const shopItem = shopItems.find((entry) => Number(entry.id) === Number(itemId));
+    const isProfessionPurchase = shopItem?.service_type === 'profession';
+    const targetCharacterOnline = isGift
+      ? Number(giftCharacter?.online || 0) === 1
+      : Number(characters.find((c) => Number(c.guid) === Number(targetGuid))?.online || 0) === 1;
+    if (isProfessionPurchase && targetCharacterOnline) {
+      setPurchaseError('El personaje está online. Desconéctalo para realizar la compra de profesión.');
+      setIsPurchaseLocked(false);
+      purchaseLock.current = false;
+      return;
+    }
+
     setPurchasingItemId(itemId);
     setPurchaseMessage('');
     setPurchaseError('');
@@ -978,6 +1083,10 @@ export default function DonatePage() {
   const currentBrowseSlug = subCategoryFilter || shopCategory;
   const currentBrowseCategory = currentBrowseSlug ? categoryBySlug.get(currentBrowseSlug) : null;
   const currentChildren = getChildrenBySlug(currentBrowseSlug);
+  const selectedSelfCharacter = characters.find(c => Number(c.guid) === Number(selectedCharacterGuid)) || null;
+  const selectedTargetOnline = deliveryMode === 'gift'
+    ? Number(giftCharacter?.online || 0) === 1
+    : Number(selectedSelfCharacter?.online || 0) === 1;
 
   const handleBackCategory = () => {
     if (!shopCategory) return;
@@ -1723,6 +1832,12 @@ export default function DonatePage() {
                                 <option value="" className="bg-[#0d131b]">-- Selecciona quién recibirá el item --</option>
                                 {characters.map(c => <option key={c.guid} value={c.guid} className="bg-[#0d131b] font-bold">{c.name} (WotLK • Nv. {c.level})</option>)}
                              </select>
+                             {Number(selectedSelfCharacter?.online || 0) === 1 && (
+                               <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-amber-300">
+                                 <AlertTriangle className="w-4 h-4" />
+                                 El personaje está online. Desconéctalo para compras de profesión.
+                               </div>
+                             )}
                           </>
                         ) : (
                           <div className="space-y-4 relative">
@@ -1774,6 +1889,12 @@ export default function DonatePage() {
                           <input type="password" value={giftPin} onChange={e => setGiftPin(e.target.value.slice(0,4))} placeholder="••••" className="w-32 bg-black border-2 border-pink-500/30 rounded-xl px-4 py-3 text-center text-xl font-black tracking-[0.2em] focus:border-pink-500" />
                         </div>
                       </motion.div>
+                    )}
+                    {deliveryMode === 'gift' && Number(giftCharacter?.online || 0) === 1 && (
+                      <div className="mt-4 flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-[11px] font-black uppercase tracking-wider text-amber-300">
+                        <AlertTriangle className="w-4 h-4" />
+                        El personaje destino está online. Para profesiones, debe estar desconectado.
+                      </div>
                     )}
                     
                     {purchaseMessage && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-6 flex items-center gap-3 bg-green-500/10 border border-green-500/30 text-green-400 p-4 rounded-2xl font-bold uppercase text-[10px] tracking-wider"><CheckCircle2 className="w-4 h-4"/> {purchaseMessage}</motion.div>}
@@ -1943,34 +2064,39 @@ export default function DonatePage() {
                                         {(item.price_dp > 0 || (item.price > 0 && item.currency === 'dp')) && (
                                           <button
                                             onClick={() => handlePurchase(item.id, 'dp')}
-                                            disabled={isPurchaseLocked || purchasingItemId !== null}
+                                            disabled={isPurchaseLocked || purchasingItemId !== null || (item.service_type === 'profession' && selectedTargetOnline)}
                                             className={`flex-1 border rounded-xl py-3.5 font-black text-[10px] uppercase tracking-widest transition-all ${
                                               purchasingItemId === item.id
                                                 ? 'bg-yellow-900/40 border-yellow-700/30 text-yellow-500 cursor-not-allowed animate-pulse'
-                                                : (isPurchaseLocked || purchasingItemId !== null)
+                                                : (isPurchaseLocked || purchasingItemId !== null || (item.service_type === 'profession' && selectedTargetOnline))
                                                 ? 'bg-yellow-600/5 border-yellow-700/20 text-yellow-800 cursor-not-allowed'
                                                 : ('bg-gradient-to-r from-yellow-500/25 to-amber-500/20 hover:from-yellow-500 hover:to-amber-500 text-yellow-200 hover:text-black border-yellow-400/50 shadow-[0_0_20px_rgba(234,179,8,0.15)] active:scale-95' + (deliveryMode === 'gift' ? ' ring-2 ring-yellow-500/60 scale-[1.02]' : ''))
                                             }`}
                                           >
-                                            {purchasingItemId === item.id ? '⏳ Procesando...' : deliveryMode === 'gift' ? '🎁 Regalar con DP' : 'Donaciones'}
+                                            {purchasingItemId === item.id ? '⏳ Procesando...' : (item.service_type === 'profession' && selectedTargetOnline) ? 'Desconecta personaje' : deliveryMode === 'gift' ? '🎁 Regalar con DP' : 'Donaciones'}
                                           </button>
                                         )}
                                         {deliveryMode !== 'gift' && (item.price_vp > 0 || (item.currency === 'vp' && item.price > 0)) && (
                                           <button
                                             onClick={() => handlePurchase(item.id, 'vp')}
-                                            disabled={isPurchaseLocked || purchasingItemId !== null}
+                                            disabled={isPurchaseLocked || purchasingItemId !== null || (item.service_type === 'profession' && selectedTargetOnline)}
                                             className={`flex-1 border rounded-xl py-3.5 font-black text-[10px] uppercase tracking-widest transition-all ${
                                               purchasingItemId === item.id
                                                 ? 'bg-violet-900/40 border-violet-700/30 text-violet-500 cursor-not-allowed animate-pulse'
-                                                : (isPurchaseLocked || purchasingItemId !== null)
+                                                : (isPurchaseLocked || purchasingItemId !== null || (item.service_type === 'profession' && selectedTargetOnline))
                                                 ? 'bg-violet-600/5 border-violet-700/20 text-violet-800 cursor-not-allowed'
                                                 : 'bg-gradient-to-r from-violet-500/25 to-fuchsia-500/20 hover:from-violet-500 hover:to-fuchsia-500 text-violet-100 hover:text-white border-violet-400/50 shadow-[0_0_20px_rgba(139,92,246,0.16)] active:scale-95'
                                             }`}
                                           >
-                                            {purchasingItemId === item.id ? '⏳ Procesando...' : 'Estelas'}
+                                            {purchasingItemId === item.id ? '⏳ Procesando...' : (item.service_type === 'profession' && selectedTargetOnline) ? 'Desconecta personaje' : 'Estelas'}
                                           </button>
                                         )}
                                      </div>
+                                     {item.service_type === 'profession' && selectedTargetOnline && (
+                                       <p className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-lg px-3 py-2">
+                                         Este personaje está online. Desconéctalo para comprar profesión.
+                                       </p>
+                                     )}
                                     </div>
                                 </div>
                               </motion.div>

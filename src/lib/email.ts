@@ -7,9 +7,54 @@ const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const defaultFrom = process.env.RESEND_FROM || 'Shadow Azeroth <onboarding@resend.dev>';
 const pinTemplateId = process.env.RESEND_TEMPLATE_PIN_ID || '7d7e25cd-f80f-4823-a318-c198536244bd';
+const recruitTemplateId = process.env.RESEND_TEMPLATE_RECRUIT_ID || '';
+const creationTemplateRef = process.env.RESEND_TEMPLATE_CREATION_ID || process.env.RESEND_TEMPLATE_CORREO_CREACION_ID || '';
+const recoveryTemplateRef = process.env.RESEND_TEMPLATE_RECOVERY_ID || process.env.RESEND_TEMPLATE_RECUPERACION_CODE_ID || '';
 
 function canSendEmail() {
   return Boolean(resend);
+}
+
+function escapeRegExp(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function applyTemplateData(html: string, values: Record<string, string>): string {
+  let out = html;
+  for (const [key, value] of Object.entries(values)) {
+    const safeKey = escapeRegExp(key);
+    out = out
+      .replace(new RegExp(`{{\\s*${safeKey}\\s*}}`, 'g'), value)
+      .replace(new RegExp(`\\[\\[\\s*${safeKey}\\s*\\]\\]`, 'g'), value);
+  }
+  return out;
+}
+
+async function getResendTemplateHtml(templateRef: string): Promise<string> {
+  const ref = String(templateRef || '').trim();
+  if (!ref || !resend) return '';
+
+  try {
+    const direct = await resend.templates.get(ref);
+    const directHtml = String(((direct as any)?.data?.html) || '').trim();
+    if (directHtml) return directHtml;
+  } catch {
+    // Continue with search by template name.
+  }
+
+  try {
+    const list: any = await resend.templates.list();
+    const rows = Array.isArray(list?.data?.data) ? list.data.data : (Array.isArray(list?.data) ? list.data : []);
+    const target = ref.toLowerCase();
+    const found = rows.find((row: any) => String(row?.name || '').trim().toLowerCase() === target)
+      || rows.find((row: any) => String(row?.name || '').trim().toLowerCase().includes(target));
+
+    if (!found?.id) return '';
+    const byName = await resend.templates.get(String(found.id));
+    return String(((byName as any)?.data?.html) || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 export async function sendWelcomeEmail(params: {
@@ -18,11 +63,22 @@ export async function sendWelcomeEmail(params: {
 }) {
   if (!canSendEmail()) return { skipped: true };
 
+  let htmlContent = '';
+  if (creationTemplateRef) {
+    htmlContent = await getResendTemplateHtml(creationTemplateRef);
+    if (htmlContent) {
+      htmlContent = applyTemplateData(htmlContent, {
+        ACCOUNT_NAME: params.username,
+        USERNAME: params.username,
+      });
+    }
+  }
+
   await resend!.emails.send({
     from: defaultFrom,
     to: params.email,
     subject: 'Bienvenido a Shadow Azeroth',
-    html: `
+    html: htmlContent || `
       <div style="font-family:Arial,sans-serif;background:#090812;color:#f8fafc;padding:24px;line-height:1.6;">
         <div style="max-width:640px;margin:0 auto;background:#120b1f;border:1px solid rgba(168,85,247,.35);border-radius:18px;overflow:hidden;">
           <div style="padding:24px 24px 12px;background:linear-gradient(90deg,#28103d,#101828);">
@@ -127,11 +183,24 @@ export async function sendPasswordRecoveryEmail(params: {
 }) {
   if (!canSendEmail()) return { skipped: true };
 
+  let htmlContent = '';
+  if (recoveryTemplateRef) {
+    htmlContent = await getResendTemplateHtml(recoveryTemplateRef);
+    if (htmlContent) {
+      htmlContent = applyTemplateData(htmlContent, {
+        ACCOUNT_NAME: params.username,
+        USERNAME: params.username,
+        RECOVERY_CODE: params.newToken,
+        NEW_TOKEN: params.newToken,
+      });
+    }
+  }
+
   await resend!.emails.send({
     from: defaultFrom,
     to: params.email,
     subject: 'Recuperación de cuenta - Shadow Azeroth',
-    html: `
+    html: htmlContent || `
       <div style="font-family:Arial,sans-serif;background:#090812;color:#f8fafc;padding:24px;line-height:1.6;">
         <div style="max-width:640px;margin:0 auto;background:#120b1f;border:1px solid rgba(251,146,60,.35);border-radius:18px;overflow:hidden;">
           <div style="padding:24px 24px 12px;background:linear-gradient(90deg,#3d2206,#101828);">
@@ -148,6 +217,90 @@ export async function sendPasswordRecoveryEmail(params: {
             
             <p style="margin:0 0 12px;">Te recomendamos encarecidamente cambiar esta contraseña por una tuya desde el Panel de Usuario una vez inicies sesión.</p>
             <p style="margin:16px 0 0;color:#fcd34d;font-weight:700;">El equipo de Shadow Azeroth</p>
+          </div>
+        </div>
+      </div>
+    `,
+  });
+
+  return { skipped: false };
+}
+
+export async function sendRecruitInviteEmail(params: {
+  toEmail: string;
+  friendName: string;
+  recruiterUsername: string;
+  inviteUrl: string;
+}) {
+  if (!canSendEmail()) return { skipped: true };
+
+  if (recruitTemplateId) {
+    const templatePayload = {
+      from: defaultFrom,
+      to: params.toEmail,
+      subject: 'Invitacion a Shadow Azeroth - Recluta un Amigo',
+      templateId: recruitTemplateId,
+      data: {
+        ACCOUNT_NAME: params.friendName,
+        FRIEND_NAME: params.friendName,
+        RECRUITER_NAME: params.recruiterUsername,
+        INVITE_URL: params.inviteUrl,
+      },
+    };
+
+    try {
+      await (resend!.emails.send as any)(templatePayload);
+      return { skipped: false };
+    } catch (templateSendError: unknown) {
+      console.warn('No se pudo enviar con templateId de reclutamiento, se usara fallback HTML:', templateSendError);
+    }
+  }
+
+  let htmlContent = '';
+
+  if (recruitTemplateId) {
+    try {
+      const templateResponse = await resend!.templates.get(recruitTemplateId);
+      if ('data' in templateResponse && templateResponse.data) {
+        const templateData = templateResponse.data as { html?: string };
+        const templateHtml = String(templateData.html || '').trim();
+        if (templateHtml) {
+          htmlContent = templateHtml;
+        }
+      }
+    } catch (templateError: unknown) {
+      console.warn('No se pudo obtener template de reclutamiento en Resend, se usara fallback inline:', templateError);
+    }
+  }
+
+  if (htmlContent) {
+    htmlContent = htmlContent
+      .replace(/{{ACCOUNT_NAME}}/g, params.friendName)
+      .replace(/{{FRIEND_NAME}}/g, params.friendName)
+      .replace(/{{RECRUITER_NAME}}/g, params.recruiterUsername)
+      .replace(/{{INVITE_URL}}/g, params.inviteUrl)
+      .replace(/\[\[INVITE_URL\]\]/g, params.inviteUrl);
+  }
+
+  await resend!.emails.send({
+    from: defaultFrom,
+    to: params.toEmail,
+    subject: 'Invitacion a Shadow Azeroth - Recluta un Amigo',
+    html: htmlContent || `
+      <div style="font-family:Arial,sans-serif;background:#090812;color:#f8fafc;padding:24px;line-height:1.6;">
+        <div style="max-width:640px;margin:0 auto;background:#120b1f;border:1px solid rgba(56,189,248,.35);border-radius:18px;overflow:hidden;">
+          <div style="padding:24px 24px 12px;background:linear-gradient(90deg,#06263d,#101828);">
+            <h1 style="margin:0;font-size:26px;font-weight:800;color:#ffffff;">Recluta un Amigo</h1>
+            <p style="margin:8px 0 0;color:#cbd5e1;">${params.recruiterUsername} te invito a jugar en Shadow Azeroth.</p>
+          </div>
+          <div style="padding:24px;">
+            <p style="margin:0 0 12px;">Hola <strong>${params.friendName}</strong>,</p>
+            <p style="margin:0 0 12px;">Usa este enlace especial para crear tu cuenta vinculada al sistema de reclutamiento.</p>
+            <div style="margin:20px 0;">
+              <a href="${params.inviteUrl}" style="display:inline-block;padding:12px 18px;border-radius:10px;background:#0ea5e9;color:#ffffff;text-decoration:none;font-weight:700;">Crear Cuenta Vinculada</a>
+            </div>
+            <p style="margin:0 0 12px;color:#cbd5e1;">Beneficios al reclutarte: recibiras 4 bolsas de bienvenida + 300g para reclamar desde el panel web y elegir el personaje destino.</p>
+            <p style="margin:0;color:#67e8f9;font-weight:700;">Nos vemos en Azeroth.</p>
           </div>
         </div>
       </div>

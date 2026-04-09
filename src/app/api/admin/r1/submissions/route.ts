@@ -4,6 +4,7 @@ import path from 'path';
 import { authPool, pool } from '@/lib/db';
 import { assertAdmin } from '@/lib/admin';
 import type { RowDataPacket, ResultSetHeader } from 'mysql2';
+import { isValidAddon, normalizeAddon, type AddonRecord } from '@/lib/addons';
 
 type SubmissionType = 'shop' | 'addon' | 'forum';
 
@@ -40,17 +41,18 @@ async function ensureSubmissionTable() {
   `);
 }
 
-async function readAddons(): Promise<Array<{ name: string; url: string }>> {
+async function readAddons(): Promise<AddonRecord[]> {
   try {
     const raw = await fs.readFile(ADDONS_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((entry, idx) => normalizeAddon(entry, idx)).filter(isValidAddon);
   } catch {
     return [];
   }
 }
 
-async function writeAddons(addons: Array<{ name: string; url: string }>) {
+async function writeAddons(addons: AddonRecord[]) {
   await fs.mkdir(path.dirname(ADDONS_PATH), { recursive: true });
   await fs.writeFile(ADDONS_PATH, JSON.stringify(addons, null, 2), 'utf-8');
 }
@@ -136,12 +138,11 @@ async function publishShopSubmission(payload: any) {
 }
 
 async function publishAddonSubmission(payload: any) {
-  const name = String(payload?.name || '').trim();
-  const url = String(payload?.url || '').trim();
-  if (!name || !url) throw new Error('Addon requiere nombre y URL');
+  const addon = normalizeAddon(payload);
+  if (!isValidAddon(addon)) throw new Error('Addon requiere nombre y URL');
 
   const addons = await readAddons();
-  addons.push({ name, url });
+  addons.push(addon);
   await writeAddons(addons);
 }
 

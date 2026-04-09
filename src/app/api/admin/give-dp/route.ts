@@ -4,7 +4,7 @@ import { RowDataPacket } from 'mysql2';
 
 export async function POST(request: Request) {
   try {
-    const { targetUsername, amount, currency = 'dp' } = await request.json();
+    const { targetUsername, amount, currency = 'dp', operation = 'add' } = await request.json();
 
     if (!targetUsername || !amount || Number(amount) <= 0) {
       return NextResponse.json({ error: 'Faltan parámetros o la cantidad es inválida' }, { status: 400 });
@@ -12,6 +12,10 @@ export async function POST(request: Request) {
 
     if (currency !== 'dp' && currency !== 'vp') {
       return NextResponse.json({ error: 'Moneda inválida. Usa dp o vp.' }, { status: 400 });
+    }
+
+    if (operation !== 'add' && operation !== 'remove') {
+      return NextResponse.json({ error: 'Operación inválida. Usa add o remove.' }, { status: 400 });
     }
 
     if (!authPool) {
@@ -23,7 +27,7 @@ export async function POST(request: Request) {
 
     // Buscar si la cuenta existe
     const [rows] = await authPool.query<RowDataPacket[]>(
-      'SELECT id, username FROM account WHERE UPPER(username) = ?',
+      'SELECT id, username, dp, vp FROM account WHERE UPPER(username) = ?',
       [cleanUsername]
     );
 
@@ -31,24 +35,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'La cuenta no existe' }, { status: 404 });
     }
 
-    // Actualizar DP o VP
-    if (currency === 'dp') {
-      await authPool.query(
-        'UPDATE account SET dp = dp + ? WHERE UPPER(username) = ?',
-        [finalAmount, cleanUsername]
-      );
-    } else {
-      await authPool.query(
-        'UPDATE account SET vp = vp + ? WHERE UPPER(username) = ?',
-        [finalAmount, cleanUsername]
+    const currentDp = Number(rows[0]?.dp || 0);
+    const currentVp = Number(rows[0]?.vp || 0);
+    const current = currency === 'dp' ? currentDp : currentVp;
+
+    if (operation === 'remove' && current < finalAmount) {
+      return NextResponse.json(
+        { error: `Saldo insuficiente. La cuenta tiene ${current} ${currency.toUpperCase()}.` },
+        { status: 400 },
       );
     }
 
+    const signedAmount = operation === 'remove' ? -finalAmount : finalAmount;
+    const column = currency === 'dp' ? 'dp' : 'vp';
+    await authPool.query(
+      `UPDATE account SET ${column} = ${column} + ? WHERE UPPER(username) = ?`,
+      [signedAmount, cleanUsername]
+    );
+
     const currencyName = currency === 'dp' ? 'Donation Points' : 'Estelas';
+    const verb = operation === 'remove' ? 'descontaron' : 'añadieron';
 
     return NextResponse.json({ 
       success: true, 
-      message: `Se añadieron ${finalAmount} ${currencyName} correctamente a la cuenta ${rows[0].username}` 
+      message: `Se ${verb} ${finalAmount} ${currencyName} correctamente a la cuenta ${rows[0].username}` 
     });
 
   } catch (error: unknown) {

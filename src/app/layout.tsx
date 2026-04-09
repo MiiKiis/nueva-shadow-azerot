@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import "./effects.css";
 import ClientHeader from "@/components/ClientHeader";
@@ -82,6 +83,53 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
+        <Script id="strip-bis-skin-checked" strategy="beforeInteractive">
+          {`
+            (function () {
+              try {
+                var strip = function (root) {
+                  var scope = root || document;
+                  var nodes = scope.querySelectorAll ? scope.querySelectorAll('[bis_skin_checked]') : [];
+                  for (var i = 0; i < nodes.length; i++) {
+                    nodes[i].removeAttribute('bis_skin_checked');
+                  }
+                };
+
+                strip(document);
+
+                var observer = new MutationObserver(function (mutations) {
+                  for (var i = 0; i < mutations.length; i++) {
+                    var mutation = mutations[i];
+
+                    if (mutation.type === 'attributes' && mutation.attributeName === 'bis_skin_checked' && mutation.target && mutation.target.removeAttribute) {
+                      mutation.target.removeAttribute('bis_skin_checked');
+                    }
+
+                    if (mutation.addedNodes && mutation.addedNodes.length) {
+                      for (var j = 0; j < mutation.addedNodes.length; j++) {
+                        var node = mutation.addedNodes[j];
+                        if (node && node.nodeType === 1) strip(node);
+                      }
+                    }
+                  }
+                });
+
+                observer.observe(document.documentElement, {
+                  subtree: true,
+                  childList: true,
+                  attributes: true,
+                  attributeFilter: ['bis_skin_checked']
+                });
+
+                window.addEventListener('DOMContentLoaded', function () {
+                  strip(document);
+                });
+              } catch (e) {
+                // Ignore silently: this is only a hydration mismatch guard.
+              }
+            })();
+          `}
+        </Script>
         <link rel="icon" href="/icon.png" />
       </head>
       <body

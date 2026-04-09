@@ -68,6 +68,26 @@ function PreviewBlock({ submission }: { submission: Submission }) {
         <p className="text-[11px] uppercase tracking-wider text-emerald-300 font-black mb-1">Previsualizacion de addon</p>
         <p className="text-white font-black">{String(payload.title || payload.name || 'Sin titulo')}</p>
         {!!payload.description && <p className="text-xs text-gray-300 mt-1">{String(payload.description)}</p>}
+        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+          {!!payload.url && (
+            <a href={String(payload.url)} target="_blank" rel="noopener" className="text-blue-300 hover:text-blue-200 underline">Enlace addon</a>
+          )}
+          {!!payload.videoUrl && (
+            <a href={String(payload.videoUrl)} target="_blank" rel="noopener" className="text-rose-300 hover:text-rose-200 underline">Video</a>
+          )}
+          {Array.isArray(payload.images) && payload.images.length > 0 && (
+            <span className="text-gray-300">Imagenes: {payload.images.length}</span>
+          )}
+        </div>
+        {Array.isArray(payload.categories) && payload.categories.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {payload.categories.map((cat: string, idx: number) => (
+              <span key={`${cat}-${idx}`} className="px-2 py-1 rounded-md border border-white/15 bg-white/5 text-[10px] uppercase tracking-wider text-gray-300">
+                {cat}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     );
   }

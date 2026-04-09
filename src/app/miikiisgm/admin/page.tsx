@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import QrBoliviaAdminForm from './QrBoliviaAdminForm';
 import AdminNewsAddons from './AdminNewsAddons';
 import { useRouter } from 'next/navigation';
@@ -166,7 +166,10 @@ export default function AdminShopPage() {
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_ITEM);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [expandedMainCategoryId, setExpandedMainCategoryId] = useState<number | null>(null);
   const [imagePreviewFailed, setImagePreviewFailed] = useState(false);
+  const categoryPickerRef = useRef<HTMLDivElement | null>(null);
 
   // tabs
   const [activeTab, setActiveTab] = useState<AdminTab>('shop');
@@ -210,6 +213,28 @@ export default function AdminShopPage() {
     };
   });
 
+  const categoryChildrenByParent = useMemo(() => {
+    const byParent = new Map<number | null, { id: number; slug: string; name: string; parent_id?: number | null }[]>();
+
+    for (const category of orderedCategories) {
+      const parentId = normalizeCategoryParent(category.parent_id);
+      const list = byParent.get(parentId) || [];
+      list.push(category);
+      byParent.set(parentId, list);
+    }
+
+    for (const [key, list] of byParent.entries()) {
+      byParent.set(key, [...list].sort((a, b) => a.name.localeCompare(b.name)));
+    }
+
+    return byParent;
+  }, [orderedCategories]);
+
+  const mainCategories = useMemo(
+    () => (categoryChildrenByParent.get(null) || []).sort((a, b) => a.name.localeCompare(b.name)),
+    [categoryChildrenByParent],
+  );
+
   const normalizedImageInput = String(newItem.image || '').trim() || 'inv_misc_questionmark';
   const resolvedPreviewImage = (() => {
     if (/^https?:\/\//i.test(normalizedImageInput)) return normalizedImageInput;
@@ -233,6 +258,18 @@ export default function AdminShopPage() {
   useEffect(() => {
     setImagePreviewFailed(false);
   }, [newItem.image]);
+
+  useEffect(() => {
+    if (!categoryPickerOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!categoryPickerRef.current) return;
+      if (!categoryPickerRef.current.contains(event.target as Node)) {
+        setCategoryPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [categoryPickerOpen]);
 
   const selectedCategoryPath = categoryOptions.find(opt => opt.slug === newItem.category)?.label || '';
 
@@ -405,7 +442,7 @@ export default function AdminShopPage() {
           serviceData: finalServiceType === 'level_boost'
             ? JSON.stringify({ level: Number(newItem.boostLevel) || 80, gold: Number(newItem.boostGold) || 0, items: newItem.boostItems.trim() })
             : finalServiceType === 'profession'
-            ? JSON.stringify({ skillId: Number(newItem.bundleItems[0]?.id) || 0, skillLevel: Number(newItem.serviceData) || 450, materials: newItem.profMaterials.trim() })
+            ? JSON.stringify({ skillId: Number(newItem.bundleItems[0]?.id) || 0, skillLevel: Math.max(1, Math.min(Number(newItem.serviceData) || 450, 450)), materials: newItem.profMaterials.trim() })
             : finalServiceData,
           faction: newItem.faction || 'all',
           itemLevel: Number(newItem.itemLevel) || 0,
@@ -809,27 +846,84 @@ export default function AdminShopPage() {
                       <p className="text-[10px] text-violet-300/40 mt-1">Soulbound • Sin regalo</p>
                     </div>
                     {/* Category */}
-                    <div>
+                    <div className="lg:col-span-2 relative" ref={categoryPickerRef}>
                       <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">Categoría</label>
-                      <select
-                        value={newItem.category}
-                        onChange={e => setNewItem(p => ({ ...p, category: e.target.value }))}
-                        className="w-full bg-[#0a0a1a] border border-purple-500/30 rounded-xl px-5 py-3.5 text-white focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition-all text-sm cursor-pointer"
+                      <button
+                        type="button"
+                        onClick={() => setCategoryPickerOpen((v) => !v)}
+                        className="w-full inline-flex items-center justify-between gap-2 bg-black/50 border border-cyan-500/30 rounded-xl px-4 py-3 text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition-all text-sm"
                       >
-                        <option value="" className="bg-[#0a0a1a] text-gray-300">-- Seleccionar categoría/subcategoría --</option>
-                        {categoryOptions.map(opt => (
-                          <option
-                            key={opt.id}
-                            value={opt.slug}
-                            style={{ backgroundColor: '#0a0a1a', color: opt.depth === 0 ? '#00f2ff' : '#e5e7eb', fontWeight: opt.depth === 0 ? 'bold' : 'normal' }}
-                          >
-                            {opt.label}
-                          </option>
-                        ))}
-                        {categories.length === 0 && (
-                          <option value="misc" className="bg-[#0a0a1a] text-white">Otros</option>
-                        )}
-                      </select>
+                        <span className="truncate">{selectedCategoryPath || 'Seleccionar categoría'}</span>
+                        <span className="text-cyan-300">▾</span>
+                      </button>
+
+                      {categoryPickerOpen && (
+                        <div className="absolute left-0 right-0 mt-2 max-h-80 overflow-y-auto rounded-xl border border-cyan-500/30 bg-[#0a1222]/95 shadow-[0_12px_34px_rgba(0,0,0,.5)] z-50 p-2">
+                          <p className="px-2 pb-2 text-[10px] uppercase tracking-[0.16em] text-cyan-300 font-black">Categorías de tienda</p>
+                          <div className="space-y-1">
+                            {categories.length === 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewItem((p) => ({ ...p, category: 'misc' }));
+                                  setCategoryPickerOpen(false);
+                                }}
+                                className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-colors ${newItem.category === 'misc' ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100' : 'border-cyan-900/30 bg-black/25 text-slate-200 hover:bg-cyan-900/15'}`}
+                              >
+                                Otros
+                              </button>
+                            ) : (
+                              mainCategories.map((main) => {
+                                const children = (categoryChildrenByParent.get(Number(main.id)) || []).sort((a, b) => a.name.localeCompare(b.name));
+                                const expanded = expandedMainCategoryId === Number(main.id);
+                                const selectedMain = newItem.category === main.slug;
+
+                                return (
+                                  <div key={`main-category-${main.id}`} className="rounded-lg border border-cyan-500/15 bg-black/20">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (children.length === 0) {
+                                          setNewItem((p) => ({ ...p, category: main.slug }));
+                                          setCategoryPickerOpen(false);
+                                          return;
+                                        }
+                                        setExpandedMainCategoryId((v) => (v === Number(main.id) ? null : Number(main.id)));
+                                      }}
+                                      className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-xs font-bold transition-colors ${selectedMain ? 'bg-cyan-900/25 text-cyan-100' : 'text-slate-200 hover:bg-cyan-900/15'}`}
+                                    >
+                                      <span className="truncate">{main.name}</span>
+                                      <span className="text-cyan-300 text-[10px]">{children.length > 0 ? (expanded ? '▴' : '▾') : '•'}</span>
+                                    </button>
+
+                                    {expanded && children.length > 0 && (
+                                      <div className="px-2 pb-2 space-y-1">
+                                        {children.map((sub) => {
+                                          const selectedSub = newItem.category === sub.slug;
+                                          return (
+                                            <button
+                                              key={`sub-category-${sub.id}`}
+                                              type="button"
+                                              onClick={() => {
+                                                setNewItem((p) => ({ ...p, category: sub.slug }));
+                                                setCategoryPickerOpen(false);
+                                              }}
+                                              className={`w-full text-left rounded-md border px-2 py-1.5 text-xs transition-colors ${selectedSub ? 'border-cyan-400/50 bg-cyan-500/20 text-cyan-100' : 'border-cyan-900/30 bg-black/25 text-slate-200 hover:bg-cyan-900/15'}`}
+                                            >
+                                              ↳ {sub.name}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="mt-2 rounded-lg border border-cyan-500/20 bg-cyan-950/20 px-3 py-2">
                         <p className="text-[10px] uppercase tracking-wider text-cyan-300/80 font-black">Ruta seleccionada</p>
                         <p className="text-xs text-cyan-100 font-semibold break-words">
