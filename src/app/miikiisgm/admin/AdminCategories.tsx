@@ -384,6 +384,19 @@ export default function AdminCategories() {
             />
           </div>
 
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Hash className="w-3 h-3 text-fuchsia-500" /> Orden de Prioridad (Menor = Primero)
+            </label>
+            <input 
+              type="number"
+              className="w-full bg-black/60 border border-purple-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-400/50 transition-all text-sm" 
+              placeholder="0" 
+              value={form.order_index} 
+              onChange={e => setForm({...form, order_index: e.target.value})} 
+            />
+          </div>
+
           <div className="md:col-span-full flex gap-3 pt-4 border-t border-white/5">
             <button 
               className="flex-1 bg-gradient-to-r from-fuchsia-700 to-purple-700 hover:from-fuchsia-600 hover:to-purple-600 text-white font-black px-8 py-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50" 

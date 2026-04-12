@@ -4,9 +4,7 @@ import { executeSoapCommand } from '@/lib/soap';
 
 const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID || '';
 const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || '';
-const PAYPAL_API = process.env.PAYPAL_ENV === 'sandbox' 
-  ? 'https://api-m.sandbox.paypal.com' 
-  : 'https://api-m.paypal.com';
+const PAYPAL_API = 'https://api-m.paypal.com';
 
 async function getAccessToken() {
   const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_CLIENT_SECRET}`).toString('base64');
@@ -46,6 +44,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Faltan datos obligatorios (orderID, userId o points)' }, { status: 400 });
     }
 
+    // Validar cuenta ANTES de capturar pago para evitar cobros sin asignacion de creditos.
+    const [accountRows]: any = await authPool.query(
+      'SELECT id, username FROM account WHERE id = ? LIMIT 1',
+      [Number(userId)]
+    );
+
+    if (!accountRows || accountRows.length === 0) {
+      return NextResponse.json({ error: 'Usuario no encontrado en la base de datos' }, { status: 404 });
+    }
+
+    const username = String(accountRows[0].username || 'Jugador');
+
     const accessToken = await getAccessToken();
 
     // 1. Capturar el pedido en PayPal
@@ -72,17 +82,8 @@ export async function POST(req: Request) {
       );
 
       if (result.affectedRows === 0) {
-        console.error(`❌ Usuario ID ${userId} no encontrado después del pago.`);
-        return NextResponse.json({ error: 'Usuario no encontrado en la base de datos' }, { status: 404 });
-      }
-
-      // 3. Obtener el nombre de usuario para la notificación SOAP
-      let username = 'Jugador';
-      try {
-        const [rows]: any = await authPool.query('SELECT username FROM account WHERE id = ?', [userId]);
-        if (rows.length > 0) username = rows[0].username;
-      } catch (err) {
-          console.warn('Error obteniendo username para SOAP:', err);
+        console.error(`❌ Actualizacion DP sin filas afectadas para usuario ${userId}.`);
+        return NextResponse.json({ error: 'No se pudieron acreditar los creditos al usuario.' }, { status: 500 });
       }
 
       // 4. Ejecutar notificación SOAP

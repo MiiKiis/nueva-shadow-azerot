@@ -156,9 +156,13 @@ export async function sendPinReminderEmail(toEmail: string, accountName: string,
     htmlContent = fs.readFileSync(templatePath, 'utf-8');
   }
 
-  htmlContent = htmlContent
-    .replace(/{{ACCOUNT_NAME}}/g, accountName)
-    .replace(/{{PIN_CODE}}/g, pinCode);
+  htmlContent = applyTemplateData(htmlContent, {
+    ACCOUNT_NAME: accountName,
+    PIN_CODE: pinCode,
+    // Aliases
+    USERNAME: accountName,
+    PIN: pinCode
+  });
 
   const { data, error } = await resend!.emails.send({
     from: process.env.RESEND_FROM || 'Shadow Azeroth <noreply@shadowazeroth.com>',
@@ -186,14 +190,13 @@ export async function sendPasswordRecoveryEmail(params: {
   let htmlContent = '';
   if (recoveryTemplateRef) {
     htmlContent = await getResendTemplateHtml(recoveryTemplateRef);
-    if (htmlContent) {
       htmlContent = applyTemplateData(htmlContent, {
         ACCOUNT_NAME: params.username,
         USERNAME: params.username,
         RECOVERY_CODE: params.newToken,
         NEW_TOKEN: params.newToken,
+        PIN_CODE: params.newToken, // Added alias because user's template might use this tag
       });
-    }
   }
 
   await resend!.emails.send({

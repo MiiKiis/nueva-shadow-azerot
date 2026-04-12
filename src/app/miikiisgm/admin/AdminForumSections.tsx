@@ -15,7 +15,7 @@ interface ForumSection {
   order_index: number;
 }
 
-const EMPTY_SECTION: Omit<ForumSection, 'order_index'> = {
+const EMPTY_SECTION: ForumSection = {
   id: '',
   label: '',
   description: '',
@@ -24,6 +24,7 @@ const EMPTY_SECTION: Omit<ForumSection, 'order_index'> = {
   border: 'border-purple-700/50',
   text_color: 'text-purple-300',
   parent_id: null,
+  order_index: 0,
 };
 
 const PRESET_COLORS = [
@@ -46,7 +47,7 @@ export default function AdminForumSections() {
 
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<Omit<ForumSection, 'order_index'>>(EMPTY_SECTION);
+  const [form, setForm] = useState<ForumSection>(EMPTY_SECTION);
 
   const getStoredUser = () => {
     try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; }
@@ -88,6 +89,7 @@ export default function AdminForumSections() {
       border: s.border || 'border-purple-700/50',
       text_color: s.text_color || 'text-purple-300',
       parent_id: s.parent_id || null,
+      order_index: s.order_index || 0,
     });
     setEditingId(s.id);
     setIsEditing(true);
@@ -125,6 +127,7 @@ export default function AdminForumSections() {
           border: form.border,
           text_color: form.text_color,
           parent_id: form.parent_id?.trim() || null,
+          order_index: form.order_index,
         }),
       });
       const data = await res.json();
@@ -232,6 +235,20 @@ export default function AdminForumSections() {
               </select>
             </div>
 
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Hash className="w-3 h-3 text-purple-500" /> Orden de Prioridad (Menor = Primero)
+              </label>
+              <input
+                type="number"
+                className="w-full bg-black/60 border border-purple-500/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-400/50 text-sm"
+                placeholder="0"
+                value={form.order_index}
+                onChange={e => setForm({ ...form, order_index: parseInt(e.target.value) || 0 })}
+                min="0"
+              />
+            </div>
+
             <div className="md:col-span-3 space-y-1">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descripción</label>
               <textarea
@@ -321,6 +338,8 @@ export default function AdminForumSections() {
                             <span>ID: {parent.id}</span>
                             <span>•</span>
                             <span className={parent.text_color || 'text-purple-400'}>{subs.length} Subsecciones</span>
+                            <span>•</span>
+                            <span className="text-gray-500">Orden: {parent.order_index}</span>
                             {parent.description && <><span>•</span><span className="text-gray-600 truncate max-w-[200px]">{parent.description}</span></>}
                           </div>
                         </div>

@@ -546,6 +546,10 @@ export default function DonatePage() {
           },
           onApprove: async (data: any, actions: any) => {
             try {
+              if (!user?.id) {
+                throw new Error('Debes iniciar sesion para acreditar tus creditos.');
+              }
+
               const currentCustom = customAmountRef.current;
               const finalPoints = isCustomMode ? Number(currentCustom) : Number(selectedDonation?.points);
               const res = await fetch('/api/payments/paypal/capture', {
@@ -1270,7 +1274,15 @@ export default function DonatePage() {
                     <div className="font-black text-3xl mb-1 text-white">${don.amount} <span className="text-sm font-medium text-gray-500 uppercase">USD</span></div>
                     <div className="text-yellow-400 font-black text-xl mb-4 tracking-tight">{don.points} Créditos</div>
                     <button 
-                      onClick={() => { setIsCustomMode(false); setSelectedDonation(don); setShowCheckout(true); }} 
+                      onClick={() => {
+                        if (!user?.id) {
+                          setPaymentResult({ success: false, message: 'Inicia sesion antes de pagar para poder acreditar tus creditos.' });
+                          return;
+                        }
+                        setIsCustomMode(false);
+                        setSelectedDonation(don);
+                        setShowCheckout(true);
+                      }} 
                       className="mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black px-8 py-4 rounded-2xl w-full shadow-lg transition-all active:scale-95 uppercase text-xs"
                     >
                       Seleccionar
@@ -1286,7 +1298,15 @@ export default function DonatePage() {
                   <div className="font-black text-2xl mb-1 text-cyan-300 uppercase italic">Personalizado</div>
                   <p className="text-gray-400 text-[10px] uppercase font-bold text-center mb-6 tracking-widest">Cualquier monto que desees</p>
                   <button 
-                    onClick={() => { setIsCustomMode(true); setSelectedDonation({ valuePerPoint: '', amount: 0, points: 0, bonus: 0, badge: null, highlight: false, plan: 'Custom' }); setShowCheckout(true); }} 
+                    onClick={() => {
+                      if (!user?.id) {
+                        setPaymentResult({ success: false, message: 'Inicia sesion antes de pagar para poder acreditar tus creditos.' });
+                        return;
+                      }
+                      setIsCustomMode(true);
+                      setSelectedDonation({ valuePerPoint: '', amount: 0, points: 0, bonus: 0, badge: null, highlight: false, plan: 'Custom' });
+                      setShowCheckout(true);
+                    }} 
                     className="mt-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-black px-8 py-4 rounded-2xl w-full shadow-lg transition-all active:scale-95 uppercase text-xs"
                   >
                     Configurar

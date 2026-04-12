@@ -45,7 +45,8 @@ export async function GET(request: Request) {
       { name: 'service_type', type: 'VARCHAR(50) NOT NULL DEFAULT \'none\'' },
       { name: 'service_data', type: 'TEXT NULL DEFAULT NULL' },
       { name: 'faction', type: 'VARCHAR(10) NOT NULL DEFAULT \'all\'' },
-      { name: 'item_level', type: 'INT UNSIGNED NOT NULL DEFAULT 0' }
+      { name: 'item_level', type: 'INT UNSIGNED NOT NULL DEFAULT 0' },
+      { name: 'order_index', type: 'INT NOT NULL DEFAULT 0' }
     ];
 
     for (const col of columnsToFix) {
@@ -53,9 +54,9 @@ export async function GET(request: Request) {
     }
 
     const [rows] = await authPool.query<RowDataPacket[]>(
-      `SELECT id, name, item_id, price, currency, price_dp, price_vp, quality, category, tier, class_mask, image, soap_item_count, service_type, service_data, faction, item_level, description
+      `SELECT id, name, item_id, price, currency, price_dp, price_vp, quality, category, tier, class_mask, image, soap_item_count, service_type, service_data, faction, item_level, description, order_index
        FROM shop_items
-       ORDER BY id DESC`
+       ORDER BY order_index ASC, id DESC`
     );
 
     return NextResponse.json({ items: rows }, { status: 200 });
@@ -84,6 +85,7 @@ export async function POST(request: Request) {
       await authPool.query('ALTER TABLE shop_items ADD COLUMN item_level INT UNSIGNED NOT NULL DEFAULT 0');
       await authPool.query('ALTER TABLE shop_items ADD COLUMN soap_item_entry INT UNSIGNED NULL DEFAULT NULL');
       await authPool.query('ALTER TABLE shop_items ADD COLUMN soap_item_count INT UNSIGNED NOT NULL DEFAULT 1');
+      await authPool.query('ALTER TABLE shop_items ADD COLUMN order_index INT NOT NULL DEFAULT 0');
     } catch { /* already exist */ }
 
     const name = String(body?.name || '').trim();
@@ -119,8 +121,7 @@ export async function POST(request: Request) {
     const service_data = body?.serviceData ? String(body.serviceData) : null;
     const faction = String(body?.faction || 'all').toLowerCase();
     const itemLevel = Number(body?.itemLevel || 0);
-    const description = body?.description ? String(body.description) : null;
-    const safeItemId = Math.round(itemId);
+    const order_index = Number(body?.orderIndex || 0);
 
     if (!name || (safeItemId <= 0 && service_type === 'none') || safeItemId < 0) {
       return NextResponse.json({ error: 'Datos invalidos. Revisa name e itemId.' }, { status: 400 });
@@ -130,9 +131,9 @@ export async function POST(request: Request) {
     }
 
     const [result] = await authPool.query<ResultSetHeader>(
-      `INSERT INTO shop_items (name, item_id, price, currency, price_dp, price_vp, image, quality, category, tier, class_mask, soap_item_entry, soap_item_count, service_type, service_data, faction, item_level, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, safeItemId, legacyPrice, legacyCurrency, finalPriceDp, finalPriceVp, image, quality, category, tier, classMask, safeItemId || null, soapCount, service_type, service_data, faction, itemLevel, description]
+      `INSERT INTO shop_items (name, item_id, price, currency, price_dp, price_vp, image, quality, category, tier, class_mask, soap_item_entry, soap_item_count, service_type, service_data, faction, item_level, description, order_index)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, safeItemId, legacyPrice, legacyCurrency, finalPriceDp, finalPriceVp, image, quality, category, tier, classMask, safeItemId || null, soapCount, service_type, service_data, faction, itemLevel, description, order_index]
     );
 
     return NextResponse.json({ success: true, id: result?.insertId || null, message: 'Item agregado correctamente' }, { status: 201 });
@@ -188,15 +189,15 @@ export async function PUT(request: Request) {
     const service_data = body?.serviceData ? String(body.serviceData) : null;
     const faction = String(body?.faction || 'all').toLowerCase();
     const itemLevel = Number(body?.itemLevel || 0);
-    const description = body?.description ? String(body.description) : null;
+    const order_index = Number(body?.orderIndex || 0);
 
     const [result] = await authPool.query<ResultSetHeader>(
       `UPDATE shop_items SET
         name = ?, item_id = ?, price = ?, currency = ?, price_dp = ?, price_vp = ?, image = ?,
         quality = ?, category = ?, tier = ?, class_mask = ?,
-        soap_item_entry = ?, soap_item_count = ?, service_type = ?, service_data = ?, faction = ?, item_level = ?, description = ?
+        soap_item_entry = ?, soap_item_count = ?, service_type = ?, service_data = ?, faction = ?, item_level = ?, description = ?, order_index = ?
        WHERE id = ? LIMIT 1`,
-      [name, itemId, legacyPrice, legacyCurrency, finalPriceDp, finalPriceVp, image, body?.quality || 'comun', category, tier, classMask, itemId || null, soapCount, service_type, service_data, faction, itemLevel, description, id]
+      [name, itemId, legacyPrice, legacyCurrency, finalPriceDp, finalPriceVp, image, body?.quality || 'comun', category, tier, classMask, itemId || null, soapCount, service_type, service_data, faction, itemLevel, description, order_index, id]
     );
 
     if (!result?.affectedRows) {

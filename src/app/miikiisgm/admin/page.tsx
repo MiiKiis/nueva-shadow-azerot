@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import QrBoliviaAdminForm from './QrBoliviaAdminForm';
 import AdminNewsAddons from './AdminNewsAddons';
+import AdminDownloads from './AdminDownloads';
 import { useRouter } from 'next/navigation';
 import {
   ShieldCheck,
@@ -19,6 +20,8 @@ import {
   Coins,
   Edit2,
   MessageSquare,
+  Hash,
+  Download,
 } from 'lucide-react';
 import DarDpAdminForm from './DarDpAdminForm';
 import AdminForum from './AdminForum';
@@ -80,6 +83,7 @@ interface ShopItem {
   faction: string | null;
   item_level: number;
   description: string | null;
+  order_index: number;
 }
 
 interface NewItemForm {
@@ -98,6 +102,7 @@ interface NewItemForm {
   faction: string;
   itemLevel: string;
   description: string;
+  orderIndex: string;
   bundleItems: { id: string; count: string }[];
   // ── Boost bundle fields ──
   boostLevel: string;
@@ -123,6 +128,7 @@ const EMPTY_ITEM: NewItemForm = {
   faction: 'all',
   itemLevel: '0',
   description: '',
+  orderIndex: '0',
   bundleItems: [{ id: '', count: '1' }],
   boostLevel: '80',
   boostGold: '0',
@@ -142,7 +148,7 @@ function getStoredUser(): { id?: number; username?: string } | null {
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
-type AdminTab = 'shop' | 'categories' | 'news' | 'addons' | 'qr' | 'dar_dp' | 'forum' | 'forum_sections' | 'r1_requests';
+type AdminTab = 'shop' | 'categories' | 'news' | 'addons' | 'qr' | 'dar_dp' | 'forum' | 'forum_sections' | 'r1_requests' | 'downloads';
 
 export default function AdminShopPage() {
   const router = useRouter();
@@ -150,6 +156,7 @@ export default function AdminShopPage() {
   // auth
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [storedUsername, setStoredUsername] = useState('');
+  const [storedUserId, setStoredUserId] = useState<number>(0);
   const [passwordVerified, setPasswordVerified] = useState(false);
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -331,6 +338,7 @@ export default function AdminShopPage() {
       return;
     }
     setStoredUsername(user.username || '');
+    setStoredUserId(Number(user.id || 0));
     
     fetch(`/api/account/points?accountId=${user.id}`)
       .then((res) => res.json())
@@ -447,6 +455,7 @@ export default function AdminShopPage() {
           faction: newItem.faction || 'all',
           itemLevel: Number(newItem.itemLevel) || 0,
           description: newItem.description || '',
+          orderIndex: Number(newItem.orderIndex) || 0,
         }),
       });
  
@@ -518,6 +527,7 @@ export default function AdminShopPage() {
       faction: item.faction || 'all',
       itemLevel: String(item.item_level || 0),
       description: item.description || '',
+      orderIndex: String(item.order_index || 0),
       bundleItems: bundle,
       boostLevel,
       boostGold,
@@ -666,6 +676,7 @@ export default function AdminShopPage() {
       { id: 'qr' as AdminTab,     label: 'QR Pago', icon: <QrCode className="w-4 h-4" /> },
       { id: 'dar_dp' as AdminTab, label: 'Puntos y Estelas',  icon: <Coins className="w-4 h-4" /> },
       { id: 'forum_sections' as AdminTab, label: 'Secciones Foro', icon: <MessageSquare className="w-4 h-4" /> },
+      { id: 'downloads' as AdminTab, label: 'Descargas', icon: <Download className="w-4 h-4" /> },
     ] : []),
     ...(myGmLevel >= 1 ? [
       { id: 'r1_requests' as AdminTab, label: 'Solicitudes R1', icon: <ShieldCheck className="w-4 h-4" /> },
@@ -711,6 +722,7 @@ export default function AdminShopPage() {
 
       <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-8">
         {/* ── FORUM TAB ─────────────────────────────────────────────────────── */}
+        {activeTab === 'downloads' && <AdminDownloads userId={storedUserId} />}
         {activeTab === 'forum' && <AdminForum />}
 
         {/* ── FORUM SECTIONS TAB ─────────────────────────────────────────────────────── */}
@@ -811,9 +823,23 @@ export default function AdminShopPage() {
                       className="w-full bg-black/50 border border-purple-500/30 rounded-xl px-5 py-3.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition-all min-h-[100px] resize-y text-sm"
                     />
                   </div>
+
+                  {/* Order Index */}
+                  <div>
+                    <label className="block text-xs text-cyan-400 mb-1 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                      <Hash className="w-3 h-3 text-cyan-500" /> Orden de Prioridad (Menor = Aparece Primero)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={newItem.orderIndex}
+                      onChange={e => setNewItem(p => ({ ...p, orderIndex: e.target.value }))}
+                      className="w-full bg-black/50 border border-purple-500/30 rounded-xl px-5 py-3.5 text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 transition-all text-sm"
+                    />
+                  </div>
                 </div>
 
-                {/* ── BLOQUE 2: Precios y Tipología ── */}
+                  {/* ── BLOQUE 2: Precios y Tipología ── */}
                 <div className="bg-[#03060d]/60 border border-purple-500/20 rounded-2xl p-6 md:p-8 space-y-6">
                   <h3 className="text-sm font-black text-cyan-400 uppercase tracking-widest border-b border-purple-500/20 pb-2 flex items-center gap-2">
                     <span className="bg-cyan-900/40 text-cyan-300 w-6 h-6 rounded-full flex items-center justify-center text-xs">2</span>
@@ -1419,6 +1445,7 @@ export default function AdminShopPage() {
                         <th className="pb-3 text-left">Calidad</th>
                         <th className="pb-3 text-left">Categoría</th>
                         <th className="pb-3 text-left">Tier</th>
+                        <th className="pb-3 text-left">Orden</th>
                         <th className="pb-3 text-left"></th>
                       </tr>
                     </thead>
@@ -1439,6 +1466,7 @@ export default function AdminShopPage() {
                           <td className="py-3 capitalize text-xs">{item.quality?.replace('_', ' ')}</td>
                           <td className="py-3 uppercase text-xs">{item.category}</td>
                           <td className="py-3">{item.tier}</td>
+                          <td className="py-3 font-mono text-cyan-400">{item.order_index}</td>
                           <td className="py-3">
                             <div className="flex gap-2">
                               <button

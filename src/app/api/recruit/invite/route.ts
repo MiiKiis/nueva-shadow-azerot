@@ -65,6 +65,20 @@ export async function POST(request: Request) {
 
     const recruiterUsername = String(accRows[0].username || '').trim() || `Cuenta ${recruiterAccountId}`;
 
+    // CHECK RECRUIT LIMIT: Max 5 recruits per account
+    const [limitCheck]: any = await connection.query(
+      `SELECT COUNT(*) as total FROM recruit_a_friend_referrals 
+       WHERE recruiter_account_id = ? AND status IN ('registered', 'rewarded')`,
+      [recruiterAccountId]
+    );
+
+    const totalRecruited = Number(limitCheck?.[0]?.total || 0);
+    if (totalRecruited >= 5) {
+      return NextResponse.json({ 
+        error: 'Has alcanzado el limite de 5 cuentas reclutadas. No puedes invitar a mas amigos.' 
+      }, { status: 403 });
+    }
+
     const inviteToken = buildRecruitInviteToken();
     const [insertResult]: any = await connection.query(
       `INSERT INTO recruit_a_friend_referrals

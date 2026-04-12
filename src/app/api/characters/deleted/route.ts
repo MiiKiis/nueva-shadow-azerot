@@ -55,14 +55,9 @@ export async function GET(request: Request) {
         [accountId]
       );
 
-      const hint = rows.length === 0
-        ? 'No hay personajes en papelera para esta cuenta. Tu core parece estar eliminando personajes de forma permanente (hard delete). Revisa la configuración CharDelete.Method en worldserver.conf.'
-        : null;
-
       return NextResponse.json({
         deletedCharacters: rows,
         mode: 'acore_deleteInfos',
-        hint,
       });
     }
 
@@ -77,14 +72,9 @@ export async function GET(request: Request) {
         [accountId]
       );
 
-      const hint = rows.length === 0
-        ? 'No hay personajes borrados en el flag deleted para esta cuenta.'
-        : null;
-
       return NextResponse.json({
         deletedCharacters: rows,
         mode: 'custom_deleted_flag',
-        hint,
       });
     }
 
@@ -99,14 +89,9 @@ export async function GET(request: Request) {
         [accountId]
       );
 
-      const hint = rows.length === 0
-        ? 'No hay personajes borrados en el flag is_deleted para esta cuenta.'
-        : null;
-
       return NextResponse.json({
         deletedCharacters: rows,
         mode: 'custom_is_deleted',
-        hint,
       });
     }
 

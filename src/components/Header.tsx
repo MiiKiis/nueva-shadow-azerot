@@ -18,6 +18,7 @@ export default function Header() {
   const [estelas, setEstelas] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [gmLevel, setGmLevel] = useState(0);
 
   useEffect(() => {
     const syncAuthState = () => {
@@ -77,6 +78,7 @@ export default function Header() {
         interface PointsData {
           dp?: number;
           vp?: number;
+          gmlevel?: number;
           error?: string;
         }
         const data = await response.json() as PointsData;
@@ -88,6 +90,7 @@ export default function Header() {
         if (!cancelled) {
           setDonationPoints(Number(data?.dp || 0));
           setEstelas(Number(data?.vp || 0));
+          setGmLevel(Number(data?.gmlevel || 0));
         }
       } catch {
         if (!cancelled) {
@@ -122,6 +125,7 @@ export default function Header() {
     { name: 'Noticias', href: '/news' },
     { name: 'Foro', href: '/forum' },
     { name: 'Addons', href: '/addons' },
+    { name: 'Descargas', href: '/downloads' },
     { name: 'Staff', href: '/staff' },
   ];
 
@@ -149,10 +153,10 @@ export default function Header() {
             />
           </div>
           <div className="flex flex-col leading-none">
-            <span className="font-black text-sm sm:text-lg tracking-wider text-white drop-shadow-[0_1px_6px_rgba(0,0,0,0.9)]">
+            <span className="font-black text-sm sm:text-xl tracking-[0.1em] text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.8)]" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
               SHADOW AZEROTH
             </span>
-            <span className="text-[9px] sm:text-[10px] tracking-[0.2em] text-cyan-300/70 font-semibold uppercase">
+            <span className="text-[9px] sm:text-[10px] tracking-[0.3em] text-cyan-300/80 font-bold uppercase" style={{ fontFamily: 'var(--font-marcellus)' }}>
               WotLK 3.3.5a
             </span>
           </div>
@@ -170,6 +174,7 @@ export default function Header() {
                     ? 'text-white bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]'
                     : 'text-slate-300 hover:text-white hover:bg-white/8'
                   }`}
+                style={{ fontFamily: 'var(--font-marcellus)' }}
               >
                 {link.name}
                 {isActive && (
@@ -178,88 +183,100 @@ export default function Header() {
               </Link>
             );
           })}
-        </nav>
+        {isLoggedIn && gmLevel >= 1 && (
+          <Link
+            href="/miikiisgm/admin"
+            className="relative px-3 lg:px-4 py-2 rounded-lg text-xs lg:text-sm font-black uppercase tracking-widest transition-all duration-200 text-cyan-400 hover:text-white hover:bg-cyan-500/10 border border-cyan-500/20"
+            style={{ fontFamily: 'var(--font-marcellus)' }}
+          >
+            ADMIN
+          </Link>
+        )}
+      </nav>
 
-        {/* Right side: Auth + Currency */}
-        <div className="flex items-center gap-2 shrink-0">
-          {isLoggedIn ? (
-            <>
-              {/* ─── DESKTOP CURRENCY DISPLAY ─── */}
-              <div className="hidden lg:block">
-                <CurrencyDisplay dp={donationPoints} estelas={estelas} />
-              </div>
+      {/* Right side: Auth + Currency */}
+      <div className="flex items-center gap-2 shrink-0">
+        {isLoggedIn ? (
+          <>
+            {/* ─── DESKTOP CURRENCY DISPLAY ─── */}
+            <div className="hidden lg:block">
+              <CurrencyDisplay dp={donationPoints} estelas={estelas} />
+            </div>
 
-              {/* ─── TABLET: compact display (sm..lg) ─── */}
-              <div className="hidden sm:flex lg:hidden items-center">
-                <CurrencyDisplay dp={donationPoints} estelas={estelas} compact />
-              </div>
+            {/* ─── TABLET: compact display (sm..lg) ─── */}
+            <div className="hidden sm:flex lg:hidden items-center">
+              <CurrencyDisplay dp={donationPoints} estelas={estelas} compact />
+            </div>
 
-              {/* ─── MOBILE: wallet toggle button ─── */}
-              <div className="relative sm:hidden">
-                <button
-                  type="button"
-                  id="mobile-wallet-toggle"
-                  onClick={() => setWalletOpen((prev) => !prev)}
-                  aria-label="Ver monedas"
-                  className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-black/40 border border-violet-500/30 hover:border-violet-400/60 transition-all"
-                >
-                  <Wallet className="w-4 h-4 text-violet-300" />
-                  {/* dot indicator */}
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
-                </button>
+            {/* ─── MOBILE: wallet toggle button ─── */}
+            <div className="relative sm:hidden">
+              <button
+                type="button"
+                id="mobile-wallet-toggle"
+                onClick={() => setWalletOpen((prev) => !prev)}
+                aria-label="Ver monedas"
+                className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-black/40 border border-violet-500/30 hover:border-violet-400/60 transition-all"
+              >
+                <Wallet className="w-4 h-4 text-violet-300" />
+                {/* dot indicator */}
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-violet-500 animate-pulse" />
+              </button>
 
-                {/* Wallet dropdown for mobile */}
-                {walletOpen && (
-                  <div className="absolute top-11 right-0 z-50 w-56 rounded-2xl border border-white/15 bg-[#0a0c14]/97 backdrop-blur-xl shadow-[0_14px_40px_rgba(0,0,0,0.7)] p-3 space-y-2">
-                    <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 px-1 pb-1 border-b border-white/8">
-                      Tu Billetera
-                    </p>
-                    {/* DP row */}
-                    <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-black/30 border border-yellow-600/20">
-                      <Image src="/coin.png" alt="Donaciones" width={26} height={26} className="rounded-full ring-1 ring-yellow-500/40 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[9px] uppercase tracking-widest text-yellow-200/60 font-black">Donaciones</p>
-                        <p className="text-sm font-black text-[#f3dc90] tabular-nums">{donationPoints.toLocaleString()}</p>
-                      </div>
-                    </div>
-                    {/* Estelas row */}
-                    <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-black/30 border border-violet-500/20 animate-estela-pulse">
-                      <span className="shrink-0 flex items-center justify-center w-[26px] h-[26px] rounded-full bg-violet-900/40 ring-1 ring-violet-500/40">
-                        <EstelaIcon size={14} />
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[9px] uppercase tracking-widest text-violet-300/60 font-black">Estelas <span className="normal-case text-violet-400/50">(Soulbound)</span></p>
-                        <p className="text-sm font-black text-violet-300 tabular-nums">{estelas.toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="pt-1 border-t border-white/8">
-                      <Link
-                        href="/donate"
-                        onClick={() => setWalletOpen(false)}
-                        className="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-violet-700/20 border border-violet-500/30 text-violet-300 text-[10px] font-black uppercase tracking-widest hover:bg-violet-700/35 transition-colors"
-                      >
-                        Comprar Estelas
-                      </Link>
+              {/* Wallet dropdown for mobile */}
+              {walletOpen && (
+                <div className="absolute top-11 right-0 z-50 w-56 rounded-2xl border border-white/15 bg-[#0a0c14]/97 backdrop-blur-xl shadow-[0_14px_40px_rgba(0,0,0,0.7)] p-3 space-y-2">
+                  <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 px-1 pb-1 border-b border-white/8">
+                    Tu Billetera
+                  </p>
+                  {/* DP row */}
+                  <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-black/30 border border-yellow-600/20">
+                    <Image src="/coin.png" alt="Donaciones" width={26} height={26} className="rounded-full ring-1 ring-yellow-500/40 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] uppercase tracking-widest text-yellow-200/60 font-black">Donaciones</p>
+                      <p className="text-sm font-black text-[#f3dc90] tabular-nums">{donationPoints.toLocaleString()}</p>
                     </div>
                   </div>
-                )}
+                  {/* Estelas row */}
+                  <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-black/30 border border-violet-500/20 animate-estela-pulse">
+                    <span className="shrink-0 flex items-center justify-center w-[26px] h-[26px] rounded-full bg-violet-900/40 ring-1 ring-violet-500/40">
+                      <EstelaIcon size={14} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[9px] uppercase tracking-widest text-violet-300/60 font-black">Estelas <span className="normal-case text-violet-400/50">(Soulbound)</span></p>
+                      <p className="text-sm font-black text-violet-300 tabular-nums">{estelas.toLocaleString()}</p>
+                    </div>
+                  </div>
+                  <div className="pt-1 border-t border-white/8">
+                    <Link
+                      href="/donate"
+                      onClick={() => setWalletOpen(false)}
+                      className="flex items-center justify-center gap-1.5 w-full h-8 rounded-lg bg-violet-700/20 border border-violet-500/30 text-violet-300 text-[10px] font-black uppercase tracking-widest hover:bg-violet-700/35 transition-colors"
+                    >
+                      Comprar Estelas
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User badge — hidden on mobile */}
+            <Link
+              href="/dashboard"
+              className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/8 border border-white/12 hover:bg-white/14 transition-all duration-200"
+            >
+              <User className={`w-4 h-4 ${gmLevel >= 1 ? 'text-purple-400' : 'text-cyan-300'}`} />
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-xs font-bold text-white max-w-[100px] truncate">{username}</span>
+                {gmLevel >= 1 && <span className="text-[8px] font-black text-purple-400 uppercase tracking-tighter">Staff Member</span>}
               </div>
+            </Link>
+          </>
+        ) : null}
 
-              {/* User badge — hidden on mobile */}
-              <Link
-                href="/dashboard"
-                className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-xl bg-white/8 border border-white/12 hover:bg-white/14 transition-all duration-200"
-              >
-                <User className="w-4 h-4 text-cyan-300" />
-                <span className="text-sm font-bold text-white max-w-[100px] truncate hidden md:inline">{username}</span>
-              </Link>
-            </>
-          ) : null}
-
-          {/* Mobile hamburger */}
-          <button
-            type="button"
-            id="mobile-menu-toggle"
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          id="mobile-menu-toggle"
             onClick={() => setMenuOpen(!menuOpen)}
             className="md:hidden p-2 rounded-lg bg-white/8 border border-white/12 hover:bg-white/14 transition-colors text-slate-200"
           >

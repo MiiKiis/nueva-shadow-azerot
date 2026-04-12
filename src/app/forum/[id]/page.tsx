@@ -65,7 +65,7 @@ const ROLE_BADGE: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  announcements: 'Anuncios',
+  announcements: 'Reporte de Bugs',
   support: 'Soporte',
   guides:  'Guías',
   guild:   'Hermandades',
@@ -170,6 +170,7 @@ export default function TopicPage() {
   const [isStaff,      setIsStaff]      = useState(false);
   const [deletingTopic, setDeletingTopic] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [topicPriority, setTopicPriority] = useState<number>(0);
   const [forumSections, setForumSections] = useState<ForumSectionOption[]>([]);
   const [moveTargetCategory, setMoveTargetCategory] = useState('');
   const [movingTopic, setMovingTopic] = useState(false);
@@ -381,6 +382,7 @@ export default function TopicPage() {
       if (!topicRes.ok)    throw new Error(topicData.error   || 'Tema no encontrado');
       if (!commentsRes.ok) throw new Error(commentsData.error || 'Error cargando comentarios');
       setTopic(topicData.topic);
+      setTopicPriority(topicData.topic.order_index ?? 0);
       setComments(Array.isArray(commentsData.comments) ? commentsData.comments : []);
       setIsGM(!!commentsData.isGM);
       setIsStaff(!!commentsData.isStaff);
@@ -540,7 +542,7 @@ export default function TopicPage() {
       const res = await fetch(`/api/forum/topics/${topicId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, status }),
+        body: JSON.stringify({ userId: user.id, status, orderIndex: topicPriority }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el estado del tema');
@@ -703,6 +705,25 @@ export default function TopicPage() {
                   <ShieldCheck className="w-4 h-4" />
                   {updatingStatus ? 'ACTUALIZANDO...' : 'Denegado'}
                 </button>
+
+                <div className="flex items-center gap-2 border-l border-white/10 pl-3">
+                  <label className="text-[9px] uppercase tracking-widest text-cyan-500 font-bold">Prioridad:</label>
+                  <input 
+                    type="number"
+                    value={topicPriority}
+                    onChange={(e) => setTopicPriority(Number(e.target.value))}
+                    className="w-16 h-8 bg-black/50 border border-cyan-500/30 rounded-lg text-center text-xs text-white focus:outline-none focus:border-cyan-400"
+                  />
+                  <button 
+                    onClick={() => handleSetTopicStatus(
+                      (topic.denied ? 'denied' : topic.completed ? 'solved' : topic.in_review ? 'review' : 'pending') as any
+                    )}
+                    disabled={updatingStatus}
+                    className="h-8 px-2 rounded-lg bg-cyan-900/40 border border-cyan-500/30 text-[10px] text-cyan-300 hover:bg-cyan-800/60 transition-colors"
+                  >
+                    ✓
+                  </button>
+                </div>
 
                 <div className="inline-flex items-center gap-2 pl-1">
                   <div className="relative" ref={movePickerRef}>

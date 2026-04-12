@@ -31,7 +31,7 @@ export default function Footer() {
   ];
 
   return (
-    <footer suppressHydrationWarning className="relative bg-[#050505] border-t border-[#d4af37]/10 pt-14 sm:pt-20 pb-10 z-10 px-4 sm:px-6 mt-16 sm:mt-20">
+    <footer suppressHydrationWarning className="relative bg-[#050505] border-t border-white/10 pt-14 sm:pt-20 pb-10 z-10 px-4 sm:px-6 mt-16 sm:mt-20">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] to-transparent opacity-50" />
       <div className="relative">
@@ -130,7 +130,7 @@ export default function Footer() {
           </div>
 
           {/* Divider */}
-          <div className="border-t border-[#d4af37]/10 my-10 sm:my-12" />
+          <div className="border-t border-white/10 my-10 sm:my-12" />
 
           {/* Bottom Info */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">

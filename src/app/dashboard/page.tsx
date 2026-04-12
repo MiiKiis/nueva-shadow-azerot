@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User, Shield, Sword, Sparkles, LogOut, Swords, Skull, CreditCard, X, Check, ChevronLeft, ChevronRight, BookOpen, ChevronDown, History, KeyRound, ShieldAlert, RefreshCw } from 'lucide-react';
+import { User, Shield, Sword, Sparkles, LogOut, Swords, Skull, CreditCard, X, Check, ChevronLeft, ChevronRight, BookOpen, ChevronDown, History, KeyRound, ShieldAlert, RefreshCw, Download, Rocket, Gamepad2, Monitor } from 'lucide-react';
 
 const raceMap: Record<number, string> = {
   1: 'Humano', 2: 'Orco', 3: 'Enano', 4: 'Elfo de la Noche', 5: 'No-Muerto',
@@ -135,6 +135,7 @@ export default function Dashboard() {
   // ── Pending Gifts (Escrow) ───────────────────────────
   const [pendingGifts, setPendingGifts] = useState<any[]>([]);
   const [pendingGiftLoading, setPendingGiftLoading] = useState<number | null>(null);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
 
   const getClassIconSrc = (classId: number) => classIconMap[classId] || '/clases/warrior.png';
 
@@ -618,12 +619,12 @@ export default function Dashboard() {
                 <span className={`text-[10px] sm:text-xs font-black uppercase tracking-[0.28em] sm:tracking-[0.6em] transition-colors duration-700 ${
                   faction === 'horde' ? 'text-red-400/80' : 'text-blue-300/80'
                 }`}>POR LA GLORIA DE</span>
-                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black italic tracking-tighter text-white uppercase leading-none">
+                <h1 className="text-3xl sm:text-5xl lg:text-7xl font-black italic tracking-tighter text-white uppercase leading-none" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
                   {faction === 'horde' ? 'LA HORDA' : 'LA ALIANZA'}
                 </h1>
                 <div className="flex items-center gap-3 pt-2">
                   <div className={`h-[2px] w-12 rounded-full ${faction === 'horde' ? 'bg-red-500' : 'bg-blue-500'}`} />
-                  <span className="text-xs sm:text-sm font-bold text-gray-400 tracking-wider sm:tracking-widest uppercase">Panel del Adalid</span>
+                  <span className="text-xs sm:text-sm font-bold text-gray-400 tracking-wider sm:tracking-widest uppercase" style={{ fontFamily: 'var(--font-marcellus)' }}>Panel del Adalid</span>
                 </div>
               </div>
             </div>
@@ -644,6 +645,14 @@ export default function Dashboard() {
             >
               <CreditCard className="w-4 h-4" />
               DONACIONES
+            </Link>
+
+            <Link
+              href="/downloads"
+              className="inline-flex h-11 sm:h-12 items-center gap-2 px-4 sm:px-6 bg-gradient-to-r from-[#080d14] to-[#0c1624] border border-cyan-500/55 text-cyan-300 hover:text-white hover:border-cyan-400 text-[10px] sm:text-xs font-black uppercase tracking-[0.14em] sm:tracking-[0.2em] transition-all rounded-xl sm:rounded-2xl shadow-[0_0_18px_rgba(34,211,238,0.22)] hover:shadow-[0_0_30px_rgba(34,211,238,0.45)]"
+            >
+              <Download className="w-4 h-4" />
+              DESCARGAS
             </Link>
             <button 
               type="button"
@@ -700,7 +709,7 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div>
-                  <h2 className="text-xl font-black uppercase tracking-tighter truncate text-white">{user.username}</h2>
+                  <h2 className="text-2xl font-black uppercase tracking-tighter truncate text-white" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>{user.username}</h2>
                   <p className={`text-[11px] font-bold uppercase tracking-widest transition-colors duration-700 ${
                     faction === 'horde' ? 'text-red-400/80' : 'text-blue-400/80'
                   }`}>ID:#{user.id} — {accountRole}</p>
@@ -748,10 +757,10 @@ export default function Dashboard() {
           {/* Character List Column */}
           <div className="w-full space-y-4 transition-all duration-300">
             <div className="mb-6 flex flex-wrap items-center gap-3 sm:gap-6">
-              <h3 className={`text-[10px] font-black uppercase tracking-[0.4em] flex items-center gap-3 transition-colors duration-700 ${
+              <h3 className={`text-[11px] font-black uppercase tracking-[0.4em] flex items-center gap-3 transition-colors duration-700 ${
                 faction === 'horde' ? 'text-red-500' : 'text-blue-400'
-              }`}>
-                <Swords className="w-4 h-4" /> RECUENTO DE BATALLA
+              }`} style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
+                <Swords className="w-5 h-5" /> RECUENTO DE BATALLA
               </h3>
               <Link
                 href="/armory"
@@ -903,7 +912,7 @@ export default function Dashboard() {
 
                     <div className="flex-1 space-y-1 min-w-0">
                       <div className="flex justify-between items-start gap-2">
-                        <h4 className="text-xl font-black italic text-white leading-none tracking-tight truncate">{char.name}</h4>
+                        <h4 className="text-xl font-black italic text-white leading-none tracking-tight truncate" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>{char.name}</h4>
                         <div className="flex flex-col items-end gap-1 shrink-0">
                           <span className={`text-[8px] font-black p-1 uppercase tracking-widest border ${char.online ? 'border-green-600 text-green-500 bg-green-500/5' : 'border-gray-800 text-gray-600'}`}>
                             {char.online ? 'ONLINE' : 'RESTING'}
@@ -941,8 +950,8 @@ export default function Dashboard() {
                     <User className="relative h-6 w-6 text-cyan-100 drop-shadow-[0_0_8px_rgba(103,232,249,0.6)]" />
                   </div>
                   <div className="leading-tight">
-                    <p className="text-cyan-50 font-black text-[13px] tracking-[0.06em] uppercase">Recluta un amigo</p>
-                    <p className="text-cyan-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Reclutamiento</p>
+                    <p className="text-cyan-50 font-black text-[14px] tracking-[0.06em] uppercase" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Recluta un amigo</p>
+                    <p className="text-cyan-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: 'var(--font-marcellus)' }}>Reclutamiento</p>
                   </div>
                 </Link>
 
@@ -955,8 +964,8 @@ export default function Dashboard() {
                     <RefreshCw className="relative h-6 w-6 text-amber-100 drop-shadow-[0_0_8px_rgba(253,230,138,0.6)] group-hover:rotate-90 transition-transform duration-500" />
                   </div>
                   <div className="leading-tight">
-                    <p className="text-amber-50 font-black text-[13px] tracking-[0.06em] uppercase">Migraciones</p>
-                    <p className="text-amber-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Traspasos</p>
+                    <p className="text-amber-50 font-black text-[14px] tracking-[0.06em] uppercase" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Migraciones</p>
+                    <p className="text-amber-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: 'var(--font-marcellus)' }}>Traspasos</p>
                   </div>
                 </Link>
 
@@ -969,8 +978,8 @@ export default function Dashboard() {
                     <Skull className="relative h-6 w-6 text-rose-100 drop-shadow-[0_0_8px_rgba(253,164,175,0.55)]" />
                   </div>
                   <div className="leading-tight">
-                    <p className="text-rose-50 font-black text-[13px] tracking-[0.06em] uppercase">Personajes borrados</p>
-                    <p className="text-rose-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]">Recuperación</p>
+                    <p className="text-rose-50 font-black text-[14px] tracking-[0.06em] uppercase" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Personajes borrados</p>
+                    <p className="text-rose-100/80 text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ fontFamily: 'var(--font-marcellus)' }}>Recuperación</p>
                   </div>
                 </Link>
               </div>
@@ -986,8 +995,8 @@ export default function Dashboard() {
           <div className="relative w-full max-w-3xl rounded-3xl border border-white/20 bg-[#101826]/95 shadow-2xl backdrop-blur-xl max-h-[90vh] overflow-hidden">
             <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-white/10 bg-black/20">
               <div>
-                <h3 className="text-base sm:text-lg font-extrabold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)]">Seleccionar avatar</h3>
-                <p className="text-xs text-slate-300">Página {avatarPage} de {totalPages}</p>
+                <h3 className="text-lg sm:text-xl font-black text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.7)] uppercase tracking-wider" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Seleccionar avatar</h3>
+                <p className="text-xs text-slate-300" style={{ fontFamily: 'var(--font-marcellus)' }}>Página {avatarPage} de {totalPages}</p>
               </div>
               <button
                 type="button"
@@ -1184,8 +1193,8 @@ export default function Dashboard() {
           <div className="relative w-full max-w-4xl rounded-3xl border border-white/20 bg-[#101826]/95 shadow-2xl backdrop-blur-xl max-h-[88vh] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-black/20">
               <div>
-                <h3 className="text-lg font-extrabold text-white">Historial de compras</h3>
-                <p className="text-xs text-slate-300">Últimas compras de tu cuenta</p>
+                <h3 className="text-lg font-black text-white uppercase tracking-wider" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Historial de compras</h3>
+                <p className="text-xs text-slate-300" style={{ fontFamily: 'var(--font-marcellus)' }}>Últimas compras de tu cuenta</p>
               </div>
               <button
                 type="button"
@@ -1216,10 +1225,10 @@ export default function Dashboard() {
                   <div className="overflow-x-auto">
                     <div className="min-w-[620px]">
                       <div className="grid grid-cols-[90px_1fr_120px_140px] bg-white/5 text-[10px] uppercase tracking-[0.2em] text-slate-300 font-black px-4 py-3">
-                        <span>Item</span>
-                        <span>Nombre</span>
-                        <span className="text-right">Costo</span>
-                        <span className="text-right">Fecha</span>
+                        <span style={{ fontFamily: 'var(--font-marcellus)' }}>Item</span>
+                        <span style={{ fontFamily: 'var(--font-marcellus)' }}>Nombre</span>
+                        <span className="text-right" style={{ fontFamily: 'var(--font-marcellus)' }}>Costo</span>
+                        <span className="text-right" style={{ fontFamily: 'var(--font-marcellus)' }}>Fecha</span>
                       </div>
                       <div>
                         {purchaseHistory.map((purchase) => (
@@ -1275,8 +1284,8 @@ export default function Dashboard() {
           <div className="relative w-full max-w-xl rounded-3xl border border-white/20 bg-[#101826]/95 shadow-2xl backdrop-blur-xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-black/20">
               <div>
-                <h3 className="text-lg font-extrabold text-white">Cambiar contraseña</h3>
-                <p className="text-xs text-slate-300">Actualiza la contraseña de tu cuenta</p>
+                <h3 className="text-lg font-black text-white uppercase tracking-wider" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>Cambiar contraseña</h3>
+                <p className="text-xs text-slate-300" style={{ fontFamily: 'var(--font-marcellus)' }}>Actualiza la contraseña de tu cuenta</p>
               </div>
               <button
                 type="button"
@@ -1370,7 +1379,7 @@ export default function Dashboard() {
           <div className="bg-[#0a0707] border border-cyan-800/40 w-full max-w-md rounded-sm overflow-hidden shadow-2xl relative flex flex-col scale-100 opacity-100">
             {/* Header */}
             <div className="p-5 border-b border-cyan-900/30 flex items-center justify-between">
-              <h3 className="text-xl font-black text-cyan-300 italic tracking-widest uppercase flex items-center gap-2">
+              <h3 className="text-xl font-black text-cyan-300 italic tracking-widest uppercase flex items-center gap-2" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
                 <ShieldAlert className="w-5 h-5 text-purple-400" /> Configurar PIN
               </h3>
               <button
@@ -1444,8 +1453,8 @@ export default function Dashboard() {
 
       <footer className="mt-24 border-t border-red-900/10 py-12">
         <div className="max-w-6xl mx-auto flex flex-col items-center gap-4 text-center">
-           <div className="text-red-900/20 font-black italic text-4xl">SHADOW AZEROTH CITADEL</div>
-           <p className="text-[8px] text-gray-700 font-bold uppercase tracking-[0.8em]">LOK&apos;TAR OGAR - VICTORY OR DEATH</p>
+           <div className="text-red-950/20 font-black italic text-4xl" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>SHADOW AZEROTH CITADEL</div>
+           <p className="text-[10px] text-gray-700 font-bold uppercase tracking-[0.8em]" style={{ fontFamily: 'var(--font-marcellus)' }}>LOK&apos;TAR OGAR - VICTORY OR DEATH</p>
         </div>
       </footer>
 

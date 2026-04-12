@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
             let inviteRow: any = null;
             if (cleanInviteToken) {
                 const [inviteRows]: any = await connection.query(
-                    `SELECT id, friend_email, recruited_account_id
+                    `SELECT id, friend_email, recruited_account_id, recruiter_account_id
                      FROM recruit_a_friend_referrals
                      WHERE invite_token = ?
                      LIMIT 1`,
@@ -301,6 +301,21 @@ export async function POST(request: NextRequest) {
                 const inviteEmail = normalizeEmail(String(inviteRow.friend_email || ''));
                 if (inviteEmail && inviteEmail !== normalizedEmail) {
                     return NextResponse.json({ success: false, message: 'Debes registrar la cuenta con el correo del enlace de invitacion.' }, { status: 400 });
+                }
+
+                // CHECK RECRUITER SLOT LIMIT
+                const [countRows]: any = await connection.query(
+                    `SELECT COUNT(*) as total 
+                     FROM recruit_a_friend_referrals 
+                     WHERE recruiter_account_id = ? AND status IN ('registered', 'rewarded')`,
+                    [Number(inviteRow.recruiter_account_id || 0)]
+                );
+                const totalAccepted = Number(countRows?.[0]?.total || 0);
+                if (totalAccepted >= 5) {
+                    return NextResponse.json({ 
+                        success: false, 
+                        message: 'Lo sentimos, este reclutador ya ha alcanzado el maximo de 5 amigos reclutados.' 
+                    }, { status: 403 });
                 }
             }
 

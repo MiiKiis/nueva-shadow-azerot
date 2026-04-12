@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { userId, id, label, description, icon, color, border, text_color, parent_id } = body;
+    const { userId, id, label, description, icon, color, border, text_color, parent_id, order_index } = body;
 
     if (!userId) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
     const gm = await isGM(userId);
@@ -40,14 +40,15 @@ export async function POST(request: Request) {
     const finalBorder = border || 'border-purple-700/50';
     const finalTextColor = text_color || 'text-purple-300';
     const finalParent = parent_id || null;
+    const finalOrder = Number(order_index || 0);
 
     await authPool.query(
-      `INSERT INTO forum_sections (id, label, description, icon, color, border, text_color, parent_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE label=?, description=?, icon=?, color=?, border=?, text_color=?, parent_id=?`,
+      `INSERT INTO forum_sections (id, label, description, icon, color, border, text_color, parent_id, order_index)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE label=?, description=?, icon=?, color=?, border=?, text_color=?, parent_id=?, order_index=?`,
       [
-        id, label, finalDesc, finalIcon, finalColor, finalBorder, finalTextColor, finalParent,
-        label, finalDesc, finalIcon, finalColor, finalBorder, finalTextColor, finalParent
+        id, label, finalDesc, finalIcon, finalColor, finalBorder, finalTextColor, finalParent, finalOrder,
+        label, finalDesc, finalIcon, finalColor, finalBorder, finalTextColor, finalParent, finalOrder
       ]
     );
 

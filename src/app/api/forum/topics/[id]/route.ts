@@ -128,8 +128,9 @@ async function resolveMigrationOutcomeCategory(currentCategory: string, nextStat
   }
 
   if (nextStatus === 'denied' && deniedChild?.id) return String(deniedChild.id);
-  if ((nextStatus === 'pending' || nextStatus === 'review') && currentCategoryId !== deletedParentId) {
-    return deletedParentId;
+  if ((nextStatus === 'pending' || nextStatus === 'review')) {
+    // Si somos GM R3 y estamos en el flujo de borrados, el destino base es el padre
+    if (currentCategoryId !== deletedParentId) return deletedParentId;
   }
 
   return null;
@@ -175,7 +176,7 @@ export async function GET(
        LEFT JOIN account a ON t.author_id = a.id
        LEFT JOIN account_access aa ON a.id = aa.\`${schema.idCol}\`
        WHERE t.id = ?
-       GROUP BY t.id, t.author_id, a.username`,
+       GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.completed, t.in_review, t.denied, t.views, t.created_at, t.author_id, t.author_character, a.username`,
       [id]
     );
 
@@ -223,6 +224,7 @@ export async function PATCH(
     const inReview = Boolean(body?.inReview);
     const requestedStatus = String(body?.status || '').trim().toLowerCase();
     const targetCategory = String(body?.targetCategory || '').trim();
+    const orderIndex = body?.orderIndex !== undefined ? Number(body.orderIndex) : null;
 
     if (!userId || userId <= 0) return NextResponse.json({ error: 'No autenticado' }, { status: 401 });
 
@@ -252,19 +254,39 @@ export async function PATCH(
       nextStatus = completed ? 'solved' : 'pending';
     }
 
-    const nextCompleted = nextStatus === 'solved' ? 1 : 0;
-    const nextInReview = nextStatus === 'review' ? 1 : 0;
-    const nextDenied = nextStatus === 'denied' ? 1 : 0;
+    let nextCompleted = nextStatus === 'solved' ? 1 : 0;
+    let nextInReview = nextStatus === 'review' ? 1 : 0;
+    let nextDenied = nextStatus === 'denied' ? 1 : 0;
 
     const currentCategory = String(currentRow?.category || '');
     let nextCategory = await resolveMigrationOutcomeCategory(currentCategory, nextStatus);
 
     if (targetCategory) {
-      const [sectionRows]: any = await authPool.query('SELECT id FROM forum_sections WHERE id = ? LIMIT 1', [targetCategory]);
+      const [sectionRows]: any = await authPool.query('SELECT id, label FROM forum_sections WHERE id = ? LIMIT 1', [targetCategory]);
       if (!sectionRows?.length) {
         return NextResponse.json({ error: 'La sección destino no existe.' }, { status: 400 });
       }
+      
       nextCategory = targetCategory;
+
+      // Smart Status Inference: Si movemos manualmente a una sección que "suena" a solucionado/denegado, actualizamos el flag.
+      // Esto ayuda a mantener "ordenada la web" como pidió el usuario.
+      const label = normalizeLoose(sectionRows[0].label);
+      const id = normalizeLoose(sectionRows[0].id);
+
+      if (label.includes('solucionado') || label.includes('aceptada') || id.includes('solucionado') || id.includes('aceptada')) {
+        nextCompleted = 1; nextInReview = 0; nextDenied = 0; nextStatus = 'solved';
+      } else if (label.includes('denegado') || label.includes('rechazado') || id.includes('denegado') || id.includes('rechazado')) {
+        nextCompleted = 0; nextInReview = 0; nextDenied = 1; nextStatus = 'denied';
+      } else if (label.includes('revision') || id.includes('revision')) {
+        nextCompleted = 0; nextInReview = 1; nextDenied = 0; nextStatus = 'review';
+      } else {
+        // Por defecto, si movemos a una sección general, mantenemos el estado actual a menos que se fuerce,
+        // pero reseteamos si es una sección de "entrada".
+        if (label.includes('reportes') || label.includes('soporte') || label.includes('denuncias')) {
+           nextCompleted = 0; nextInReview = 0; nextDenied = 0; nextStatus = 'pending';
+        }
+      }
     }
 
     if (nextCategory && nextCategory !== currentCategory) {
@@ -276,6 +298,13 @@ export async function PATCH(
       await authPool.query(
         'UPDATE forum_topics SET completed = ?, in_review = ?, denied = ?, updated_at = NOW() WHERE id = ? LIMIT 1',
         [nextCompleted, nextInReview, nextDenied, topicId]
+      );
+    }
+
+    if (orderIndex !== null) {
+      await authPool.query(
+        'UPDATE forum_topics SET order_index = ? WHERE id = ? LIMIT 1',
+        [orderIndex, topicId]
       );
     }
 

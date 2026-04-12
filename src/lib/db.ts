@@ -102,31 +102,38 @@ async function getSshTunnel(): Promise<TunnelConfig> {
 
 /**
  * Crea un Proxy para el Pool de MySQL que asegura que el túnel esté listo
- * antes de crear el pool real.
+ * antes de crear el pool real, y que reutiliza instancias globales en desarrollo.
  */
-function createSshProxiedPool(database: string) {
-  let poolPromise: Promise<mysql.Pool> | null = null;
-
+function createSshProxiedPool(database: string, globalKey: keyof typeof globalForDb) {
   async function getTargetPool() {
-    if (!poolPromise) {
-      poolPromise = (async () => {
-        const tunnel = await getSshTunnel();
-        return mysql.createPool({
-          host: process.env.SSH_ENABLED === 'true' ? '127.0.0.1' : DB_HOST,
-          port: process.env.SSH_ENABLED === 'true' ? tunnel.dbPort : DB_PORT_INITIAL,
-          user: DB_USER,
-          password: DB_PASS,
-          database: database,
-          waitForConnections: true,
-          connectionLimit: process.env.SSH_ENABLED === 'true' ? 5 : 10,
-          queueLimit: 0,
-          connectTimeout: 15000,
-          enableKeepAlive: true,
-          keepAliveInitialDelay: 10000,
-        });
-      })();
+    // Si ya tenemos el pool en global (dev mode), lo reutilizamos
+    if (globalForDb[globalKey]) {
+      return globalForDb[globalKey] as mysql.Pool;
     }
-    return poolPromise;
+
+    const tunnel = await getSshTunnel();
+    const pool = mysql.createPool({
+      host: process.env.SSH_ENABLED === 'true' ? '127.0.0.1' : DB_HOST,
+      port: process.env.SSH_ENABLED === 'true' ? tunnel.dbPort : DB_PORT_INITIAL,
+      user: DB_USER,
+      password: DB_PASS,
+      database: database,
+      waitForConnections: true,
+      connectionLimit: process.env.SSH_ENABLED === 'true' ? 5 : 20, // Aumentado un poco para mayor margen
+      queueLimit: 0,
+      connectTimeout: 15000,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      maxIdle: 10,
+      idleTimeout: 60000,
+    });
+
+    // Guardamos en global para persistencia en HMR
+    if (process.env.NODE_ENV !== 'production') {
+      (globalForDb as any)[globalKey] = pool;
+    }
+
+    return pool;
   }
 
   return new Proxy({} as mysql.Pool, {
@@ -157,14 +164,8 @@ export async function getSoapUrl() {
 // pool       → acore_characters (personajes, inventario, skills, etc.)
 // authPool   → acore_auth       (cuentas, marketplace_listings, shop_items, etc.)
 // worldPool  → acore_world      (item_template, creature_template, etc.)
-export const pool      = createSshProxiedPool(process.env.DB_CHARACTERS || 'characters');
-export const authPool  = createSshProxiedPool(process.env.DB_AUTH       || 'auth');
-export const worldPool = createSshProxiedPool(process.env.DB_WORLD      || 'world');
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForDb.pool      = pool;
-  globalForDb.authPool  = authPool;
-  globalForDb.worldPool = worldPool;
-}
+export const pool      = createSshProxiedPool(process.env.DB_CHARACTERS || 'characters', 'pool');
+export const authPool  = createSshProxiedPool(process.env.DB_AUTH       || 'auth', 'authPool');
+export const worldPool = createSshProxiedPool(process.env.DB_WORLD      || 'world', 'worldPool');
 
 export default pool;

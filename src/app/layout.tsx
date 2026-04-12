@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Cinzel_Decorative, Marcellus } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
 import "./effects.css";
@@ -9,6 +9,20 @@ import ClientWowheadScripts from "@/components/ClientWowheadScripts";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
+  subsets: ["latin"],
+  preload: false,
+});
+
+const cinzelDecorative = Cinzel_Decorative({
+  variable: "--font-cinzel-dec",
+  weight: ["400", "700", "900"],
+  subsets: ["latin"],
+  preload: false,
+});
+
+const marcellus = Marcellus({
+  variable: "--font-marcellus",
+  weight: ["400"],
   subsets: ["latin"],
   preload: false,
 });
@@ -81,7 +95,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html lang="es" className={`${geistSans.variable} ${cinzelDecorative.variable} ${marcellus.variable}`} suppressHydrationWarning>
       <head>
         <Script id="strip-bis-skin-checked" strategy="beforeInteractive">
           {`

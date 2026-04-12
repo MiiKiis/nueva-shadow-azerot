@@ -7,6 +7,7 @@ import StatCards from '@/components/StatCards';
 import Image from 'next/image';
 
 import ParallaxImage from '@/components/ParallaxImage';
+import PurpleSnow from '@/components/PurpleSnow';
 
 // reCAPTCHA v3 site key (set in .env.local)
 const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
@@ -24,6 +25,8 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
 
     const router = useRouter();
     const formRef = useRef<HTMLFormElement>(null);
+    const lkImageRef = useRef<HTMLDivElement>(null);
+    const illidanImageRef = useRef<HTMLDivElement>(null);
     const [isLogin, setIsLogin] = useState(true);
     const [isRecover, setIsRecover] = useState(false);
     const [successMsg, setSuccessMsg] = useState('');
@@ -98,6 +101,32 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
       script.async = true;
       script.onload = () => setRecaptchaReady(true);
       document.head.appendChild(script);
+    }, []);
+
+    // ── Character parallax effect ────────────────────────────
+    useEffect(() => {
+      const lkTarget = lkImageRef.current;
+      const illidanTarget = illidanImageRef.current;
+      if (!lkTarget && !illidanTarget) return;
+
+      let ticking = false;
+      const handleScroll = () => {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY;
+          const offset = Math.min(Math.max(scrollY * 0.12, -30), 30);
+          
+          if (lkTarget) lkTarget.style.transform = `translateY(${offset}px)`;
+          if (illidanTarget) illidanTarget.style.transform = `translateY(${offset * -0.5}px)`; // Different speed or direction
+          
+          ticking = false;
+        });
+      };
+
+      handleScroll();
+      window.addEventListener('scroll', handleScroll, { passive: true });
+      return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
     // ── Get reCAPTCHA token ──────────────────────────────────
@@ -281,6 +310,7 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
 
   return (
     <>
+      <PurpleSnow />
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes lightning-border {
           0% { background-position: 0% 50%; }
@@ -314,44 +344,36 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
           </button>
         </div>
 
-        {/* Parallax Background */}
-      <div className="pointer-events-none absolute inset-0 -z-30 overflow-hidden bg-[#0a0a10]">
-        <ParallaxImage 
-          src="/fono.png" 
-          alt="Shadow Azeroth Background" 
-          scale={1.25} 
-          delay={0.6}
-          transition="cubic-bezier(0,0,0,1)"
-          className="opacity-90 brightness-[0.70] scale-110"
-        />
-      </div>
 
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.15),transparent_40%),radial-gradient(circle_at_85%_8%,rgba(168,85,247,0.20),transparent_40%),linear-gradient(to_bottom,rgba(2,6,23,0.30),rgba(2,6,23,0.55))]" />
-      <div className="pointer-events-none absolute -z-10 top-20 left-[58%] -translate-x-1/2 h-72 w-[60vw] rounded-full bg-purple-500/15 blur-3xl" />
-
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 relative z-10 flex flex-col items-center text-center">
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 relative z-50 flex flex-col items-center text-center">
         <div className="pt-4 sm:pt-8 lg:pt-14 flex flex-col items-center w-full">
-          <h1 className="text-5xl sm:text-6xl xl:text-7xl font-black text-white leading-[0.95] tracking-tight drop-shadow-[0_3px_14px_rgba(0,0,0,0.85)]">
-            ÚNETE A LA LUCHA
-            <span className="block">POR AZEROTH</span>
+          <h1 className="text-5xl sm:text-6xl xl:text-8xl font-black text-white leading-[0.9] tracking-tighter drop-shadow-[0_8px_20px_rgba(0,0,0,0.95)]" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
+            <span className="bg-gradient-to-b from-white via-white to-gray-400 bg-clip-text text-transparent">ÚNETE A LA LUCHA</span>
+            <span className="block bg-gradient-to-b from-purple-400 to-indigo-500 bg-clip-text text-transparent mt-2">POR AZEROTH</span>
           </h1>
-          <p className="mt-5 max-w-xl text-xl text-slate-200/95 leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+          <p className="mt-6 max-w-xl text-2xl text-cyan-100/90 leading-snug drop-shadow-[0_4px_12px_rgba(0,0,0,0.9)] italic font-medium" style={{ fontFamily: 'var(--font-marcellus)' }}>
             Forja tu destino en IronBlood
           </p>
-          <div className="mt-6 max-w-xl space-y-2 text-lg text-slate-200/95 leading-snug drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] flex flex-col items-center">
-             <p className="flex items-center gap-2">
-             <span className="text-amber-400 font-bold">⚡ Rates Leveo:</span> <span>x8</span>
-             </p>
-             <p className="flex items-center gap-2">
-             <span className="text-emerald-400 font-bold">🛠️ Profesiones:</span> <span>x2 <small className="text-xs italic opacity-80">(Temporal)</small></span>
-             </p>
-            <p className="flex items-center gap-2">
-    <span className="text-purple-400 font-bold">💎 Drop:</span> <span>Mítico x1 / grises y verde x 3</span>
-  </p>
-  <p className="mt-4 font-semibold text-white pt-2 border-t border-white/10 italic">
-    ¡Regístrate ahora y crea tu legado!
-  </p>
-</div>
+          <div className="mt-8 max-w-xl space-y-4 text-xl text-slate-100 leading-snug drop-shadow-[0_4px_10px_rgba(0,0,0,0.95)] flex flex-col items-center" style={{ fontFamily: 'var(--font-marcellus)' }}>
+            <div className="group flex items-center gap-4 bg-white/5 backdrop-blur-sm border border-white/10 px-8 py-3 rounded-2xl transition-all hover:bg-white/10 hover:border-amber-500/30">
+              <span className="text-amber-400 font-bold drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">⚡ Rates Leveo:</span> 
+              <span className="text-2xl font-black">x8</span>
+            </div>
+            
+            <div className="group flex items-center gap-4 bg-white/5 backdrop-blur-sm border border-white/10 px-8 py-3 rounded-2xl transition-all hover:bg-white/10 hover:border-emerald-500/30">
+              <span className="text-emerald-400 font-bold drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]">🛠️ Profesiones:</span> 
+              <span className="text-2xl font-black">x2 <small className="text-sm italic opacity-70 ml-1">(Temporal)</small></span>
+            </div>
+
+            <div className="group flex items-center gap-4 bg-white/5 backdrop-blur-sm border border-white/10 px-8 py-3 rounded-2xl transition-all hover:bg-white/10 hover:border-purple-500/30">
+              <span className="text-purple-400 font-bold drop-shadow-[0_0_8px_rgba(168,85,247,0.5)]">💎 Drop:</span> 
+              <span className="text-lg font-bold">Mítico x1 / <span className="opacity-70">grises x3</span></span>
+            </div>
+
+            <p className="mt-6 font-black text-2xl text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400 pt-6 border-t border-white/20 tracking-wider uppercase drop-shadow-sm" style={{ fontFamily: 'var(--font-cinzel-dec)' }}>
+              ¡Regístrate ahora y crea tu legado!
+            </p>
+          </div>
             <div className="mt-10 rounded-2xl border border-cyan-200/35 bg-gradient-to-r from-cyan-950/80 via-slate-900/85 to-indigo-950/80 backdrop-blur-sm p-4 sm:p-5 max-w-2xl shadow-[0_14px_35px_rgba(0,0,0,0.45)]">
               <h3 className="text-xl font-black uppercase tracking-wide text-white mb-6 border-b border-white/10 pb-2">Realmlist</h3>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-6">
@@ -400,6 +422,44 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
 
 
       </section>
+
+      {/* Large Illidan image on the left side */}
+      <div 
+        ref={illidanImageRef}
+        className="pointer-events-none absolute -left-40 bottom-0 hidden xl:flex items-end justify-start w-[50vw] max-w-[42rem] 2xl:max-w-[55rem] 3xl:max-w-[70rem] h-[111vh] overflow-hidden z-10 transition-transform duration-300 ease-out"
+        style={{ willChange: 'transform' }}
+      >
+        <div className="relative h-full w-full">
+          <Image 
+            src="/illidan.svg" 
+            alt="Illidan" 
+            fill 
+            className="object-contain object-bottom drop-shadow-[0_0_80px_rgba(74,222,128,0.45)]" 
+            priority
+          />
+          {/* Subtle bottom fade to blend */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#0a0a10] via-[#0a0a10]/60 to-transparent z-30" />
+        </div>
+      </div>
+
+      {/* Large LK image on the right side */}
+      <div 
+        ref={lkImageRef} 
+        className="pointer-events-none absolute -right-40 bottom-0 hidden xl:flex items-end justify-end w-[50vw] max-w-[42rem] 2xl:max-w-[55rem] 3xl:max-w-[70rem] h-[108vh] overflow-hidden z-10 transition-transform duration-300 ease-out" 
+        style={{ willChange: 'transform' }}
+      >
+        <div className="relative h-full w-full">
+          <Image 
+            src="/lk.svg" 
+            alt="LK" 
+            fill 
+            className="object-contain object-bottom drop-shadow-[0_0_80px_rgba(34,211,238,0.45)]" 
+            priority
+          />
+          {/* Subtle bottom fade to blend */}
+          <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-[#0a0a10] via-[#0a0a10]/60 to-transparent z-30" />
+        </div>
+      </div>
 
       {/* Glassmorphism Lightning Modal */}
       {showModal && (
@@ -460,7 +520,7 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
                     onChange={handleChange}
                     required
                     className="w-full h-12 rounded-xl px-4 bg-[#741f31] border border-red-100/35 text-white placeholder:text-red-100/70 focus:outline-none focus:border-red-200/70 focus:ring-2 focus:ring-red-300/30"
-                    placeholder="tu-correo@ejemplo.com"
+                    placeholder="Correo electronico"
                   />
                 </div>
               )}
@@ -479,7 +539,7 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
                   autoCapitalize="none"
                   spellCheck={false}
                   className="w-full h-12 rounded-xl px-4 bg-[#741f31] border border-red-100/35 text-white placeholder:text-red-100/70 caret-red-100 focus:outline-none focus:border-red-200/70 focus:ring-2 focus:ring-red-300/30"
-                  placeholder="Nombre para el foro (ej: Miikiis123)"
+                  placeholder="Nombre para la cuenta"
                 />
                 {!isLogin && !isRecover && (
                   <p className={`mt-2 text-xs font-semibold ${
@@ -547,7 +607,7 @@ const RECAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '';
                     pattern="[0-9]{4}"
                     maxLength={4}
                     className="w-full h-12 rounded-xl px-4 bg-[#741f31] border border-red-100/35 text-white placeholder:text-red-100/70 focus:outline-none focus:border-red-200/70 focus:ring-2 focus:ring-red-300/30"
-                    placeholder="Ej: 1234"
+                    placeholder="1234"
                   />
                   {!isRecover && (
                     <p className="mt-2 text-xs text-slate-400">Este PIN se usara como capa extra de seguridad de tu cuenta.</p>

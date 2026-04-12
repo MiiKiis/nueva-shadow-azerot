@@ -11,6 +11,7 @@ export default function AdminForum() {
   const [category, setCategory] = useState('announcements');
   const [comment, setComment] = useState('');
   const [pinned, setPinned] = useState(false);
+  const [orderIndex, setOrderIndex] = useState('0');
   const [sections, setSections] = useState<any[]>([]);
   
   const [loading, setLoading] = useState(false);
@@ -95,7 +96,8 @@ export default function AdminForum() {
           title: title.trim(),
           category,
           comment: comment.trim(),
-          pinned
+          pinned,
+          orderIndex: Number(orderIndex) || 0
         })
       });
       const data = await res.json();
@@ -182,6 +184,16 @@ export default function AdminForum() {
             <p className="text-[10px] text-gray-500 italic">
               * Los temas fijados aparecerán al principio de la lista en el foro.
             </p>
+          </div>
+
+          <div className="max-w-[150px]">
+            <label className="block text-xs text-gray-400 mb-1 font-semibold uppercase tracking-wider">Orden (Prioridad)</label>
+            <input 
+              type="number" 
+              value={orderIndex}
+              onChange={e => setOrderIndex(e.target.value)}
+              className="w-full bg-black/50 border border-purple-500/30 rounded-xl px-5 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-400/60 transition-all font-bold text-center"
+            />
           </div>
 
           <div className="bg-[#03060d]/60 border border-purple-500/20 rounded-2xl overflow-hidden flex flex-col">

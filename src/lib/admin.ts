@@ -44,6 +44,7 @@ export async function assertAdmin(userId: number): Promise<AdminCheckResult> {
     );
     const username = (accRows?.[0]?.username || '').toLowerCase();
     if (SUPERADMIN_ACCOUNTS.includes(username)) {
+      console.log(`[AUTH] Access GRANTED for superadmin: ${username}`);
       return { ok: true };
     }
 
@@ -67,11 +68,13 @@ export async function assertAdmin(userId: number): Promise<AdminCheckResult> {
       }
     } catch { /* sin acceso GM si falla */ }
 
-    if (gmlevel < 3) {
-      return { ok: false, error: 'Acceso denegado: requiere rol de administrador', status: 403 };
+    if (gmlevel >= 3) {
+      console.log(`[AUTH] Access GRANTED for GM Level ${gmlevel} (User: ${username})`);
+      return { ok: true };
     }
 
-    return { ok: true };
+    console.log(`[AUTH] Access DENIED for User: ${username} (GM Level: ${gmlevel})`);
+    return { ok: false, error: 'Acceso denegado: requiere rol de administrador', status: 403 };
   } catch (error: unknown) {
     const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
     console.error('assertAdmin error:', errorMsg);

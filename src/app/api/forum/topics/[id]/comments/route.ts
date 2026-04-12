@@ -61,7 +61,7 @@ export async function GET(
          JOIN account a           ON c.author_id = a.id
          LEFT JOIN account_access aa ON a.id = aa.\`${schema.idCol}\`
          WHERE c.topic_id = ?
-         GROUP BY c.id, a.id, a.username
+         GROUP BY c.id, c.comment, c.created_at, c.updated_at, a.id, c.author_character, a.username
          ORDER BY c.created_at ASC`,
         [topicId]
       ),

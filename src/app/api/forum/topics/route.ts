@@ -72,6 +72,7 @@ async function runMigrations(): Promise<void> {
         in_review TINYINT(1) NOT NULL DEFAULT 0,
         denied TINYINT(1) NOT NULL DEFAULT 0,
         views INT NOT NULL DEFAULT 0,
+        order_index INT NOT NULL DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -110,7 +111,7 @@ async function runMigrations(): Promise<void> {
     const [sectionRows]: any = await authPool.query('SELECT COUNT(*) as count FROM forum_sections');
     if (sectionRows[0].count === 0) {
       const defaults = [
-        ['announcements', 'Anuncios', 'Novedades oficiales', 'Megaphone', 'from-fuchsia-700 to-fuchsia-900', 'border-fuchsia-700/50', 'text-fuchsia-300', null],
+        ['announcements', 'Reporte de Bugs', 'Reporta errores encontrados en el juego', 'Wrench', 'from-fuchsia-700 to-fuchsia-900', 'border-fuchsia-700/50', 'text-fuchsia-300', null],
         ['support', 'Soporte', 'Ayuda técnica', 'LifeBuoy', 'from-rose-700 to-rose-900', 'border-rose-700/50', 'text-rose-300', null],
         ['guides', 'Guías', 'Tutoriales y tips', 'Lightbulb', 'from-cyan-700 to-cyan-900', 'border-cyan-700/50', 'text-cyan-300', null],
         ['reports', 'Denuncias', 'Reporta infracciones', 'AlertOctagon', 'from-red-700 to-red-900', 'border-red-700/50', 'text-red-300', null],
@@ -181,6 +182,15 @@ async function runMigrations(): Promise<void> {
         labelNorm.includes('personajes borrados') ||
         labelNorm.includes('personajes eliminados');
     });
+
+    // 2.1b Renombrar Anuncios a Reporte de Bugs si existe
+    await authPool.query(
+      `UPDATE forum_sections 
+       SET label = 'Reporte de Bugs', 
+           description = 'Reporta errores encontrados en el juego',
+           icon = 'Wrench'
+       WHERE id = 'announcements' AND (label = 'Anuncios' OR label = 'announcements')`
+    );
 
     if (parentDeletedSection?.id) {
       await authPool.query(
@@ -457,6 +467,7 @@ export async function GET(request: Request) {
          COALESCE(t.in_review, 0)          AS in_review,
         COALESCE(t.denied, 0)             AS denied,
          t.views,
+         t.order_index,
          t.created_at,
          COALESCE(t.updated_at, t.created_at) AS updated_at,
          COALESCE(NULLIF(t.author_character, ''), COALESCE(a.username, '[Deleted]')) AS author_username,
@@ -476,10 +487,11 @@ export async function GET(request: Request) {
        ) fc_agg ON fc_agg.topic_id = t.id
        ${category ? 'WHERE t.category = ?' : ''}
        GROUP BY t.id, t.title, t.category, t.pinned, t.locked, t.completed, t.in_review, t.denied,
-                t.views, t.created_at, t.updated_at, t.author_id, a.username,
+                t.views, t.order_index, t.created_at, t.updated_at, t.author_id, a.username,
                 fc_agg.comment_count, fc_agg.last_reply_at
        ORDER BY (COALESCE(t.completed, 0) = 1 OR COALESCE(t.denied, 0) = 1) ASC,
                 t.pinned DESC,
+                t.order_index ASC,
                 COALESCE(t.updated_at, t.created_at) DESC`,
       category ? [category] : []
     );
@@ -497,6 +509,7 @@ export async function GET(request: Request) {
       in_review: !!r.in_review,
       denied: !!r.denied,
       views: r.views,
+      order_index: r.order_index,
       created_at: r.created_at,
       last_reply_at: r.last_reply_at ?? null,
       comment_count: Number(r.comment_count),
@@ -526,6 +539,7 @@ export async function POST(request: Request) {
     const comment  = String(body?.comment || '').trim();
     const characterName = String(body?.characterName || '').trim();
     const pinned   = body?.pinned ? 1 : 0;
+    const orderIndex = Number(body?.orderIndex || 0);
 
     const [sections] = await authPool.query<RowDataPacket[]>('SELECT id FROM forum_sections');
     const validCategories = sections.map(s => s.id);
@@ -546,19 +560,22 @@ export async function POST(request: Request) {
     );
     if (!characterRows.length) return NextResponse.json({ error: 'El personaje seleccionado no pertenece a tu cuenta' }, { status: 403 });
 
+    /* Remuevo restricción de anuncios para que puedan reportar bugs */
+    /*
     if (category === 'announcements') {
       const gm = await isGM(userId);
       if (!gm) {
         return NextResponse.json({ error: 'Solo el staff puede publicar anuncios' }, { status: 403 });
       }
     }
+    */
 
     const conn = await authPool.getConnection();
     try {
       await conn.beginTransaction();
       const [topicResult] = await conn.query<ResultSetHeader>(
-        'INSERT INTO forum_topics (title, category, author_id, author_character, pinned) VALUES (?, ?, ?, ?, ?)',
-        [title, category, userId, characterName, pinned]
+        'INSERT INTO forum_topics (title, category, author_id, author_character, pinned, order_index) VALUES (?, ?, ?, ?, ?, ?)',
+        [title, category, userId, characterName, pinned, orderIndex]
       );
       const topicId = topicResult.insertId;
       await conn.query(
